@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# yalc
+.yalc/
+yalc.lock
+
+# editors / os
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

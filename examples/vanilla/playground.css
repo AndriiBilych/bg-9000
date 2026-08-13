@@ -1,0 +1,163 @@
+:root {
+  color-scheme: dark;
+  --panel: #141c20;
+  --edge: #26343a;
+  --ink: #e6eef0;
+  --muted: #8ba3a9;
+  --accent: #5cc9d1;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #0b1114;
+  color: var(--ink);
+  font: 13px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+#bg {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.panel {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 1;
+  width: 15rem;
+  padding: 1rem;
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+h1 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.ver {
+  font-size: 0.62rem;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  padding: 0.05rem 0.3rem;
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+label {
+  font-size: 0.68rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+}
+
+output {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+select,
+button {
+  font: inherit;
+  color: var(--ink);
+  background: #0e1619;
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  padding: 0.35rem 0.5rem;
+}
+
+button {
+  flex: 1;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.buttons {
+  flex-direction: row;
+  gap: 0.5rem;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin: 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--edge);
+}
+
+.stats div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.stats dt {
+  font-size: 0.62rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.stats dd {
+  margin: 0;
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+
+.note {
+  margin: 0;
+  font-size: 0.7rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
