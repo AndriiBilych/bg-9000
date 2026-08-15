@@ -1,6 +1,6 @@
-import type { SceneContext } from '../engine/scene-context.js';
+import type { ISceneContext } from '../model/engine/scene-context.interface.js';
+import type { IConstraint } from '../model/forces/force.interface.js';
 import type { ParticleStore } from '../layers/particle-field/store.js';
-import type { Constraint } from './force.js';
 
 /**
  * Keeps every circle fully inside the viewport.
@@ -17,12 +17,12 @@ import type { Constraint } from './force.js';
  * Position is also clamped to the wall, so a particle can never accumulate
  * overshoot regardless of how large a step it took.
  */
-export class BoundaryBounce implements Constraint {
+export class BoundaryBounce implements IConstraint {
   readonly name = 'boundary-bounce';
 
   constructor(public restitution = 1) {}
 
-  resolve(store: ParticleStore, ctx: SceneContext): void {
+  resolve(store: ParticleStore, ctx: ISceneContext): void {
     const { x, y, vx, vy, radius, count } = store;
     const { width, height } = ctx;
     const e = this.restitution;
