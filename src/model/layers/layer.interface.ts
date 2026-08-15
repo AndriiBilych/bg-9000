@@ -1,5 +1,5 @@
-import type { SceneContext } from '../engine/scene-context.js';
-import type { Renderer } from '../render/renderer.js';
+import type { ISceneContext } from '../engine/scene-context.interface.js';
+import type { IRenderer } from '../render/renderer.interface.js';
 
 /**
  * The extension seam.
@@ -10,22 +10,22 @@ import type { Renderer } from '../render/renderer.js';
  * the second into a `Particle[]` shape would produce something incoherent.
  *
  * `update` must not draw and `render` must not mutate. Keeping that split is
- * what allows the simulation to be stepped without rendering (or eventually
- * moved off the main thread).
+ * what allows the simulation to be stepped without rendering, or run somewhere
+ * the renderer cannot reach.
  */
-export interface Layer {
+export interface ILayer {
   readonly name: string;
 
-  init(ctx: SceneContext): void;
+  init(ctx: ISceneContext): void;
 
   /** Advance the simulation by `ctx.dt`. No drawing. */
-  update(ctx: SceneContext): void;
+  update(ctx: ISceneContext): void;
 
   /** Draw the current state. No mutation. */
-  render(renderer: Renderer, ctx: SceneContext): void;
+  render(renderer: IRenderer, ctx: ISceneContext): void;
 
   /** The surface changed size. Previous dimensions are given for rescaling. */
-  resize(ctx: SceneContext, prevWidth: number, prevHeight: number): void;
+  resize(ctx: ISceneContext, prevWidth: number, prevHeight: number): void;
 
   dispose(): void;
 }

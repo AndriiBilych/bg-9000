@@ -2,8 +2,8 @@
  * Owns the canvas element's backing-store size and the device-pixel transform.
  *
  * Layers draw in CSS pixels and never think about DPR; the transform set here
- * is what makes that true. Capping DPR at 2 is the single largest performance
- * win available on phones, where a 3x ratio triples fill cost for a difference
+ * is what makes that true. Capping DPR at 2 is an optimization for mainly phones, 
+ * where a 3x ratio triples fill cost for a difference
  * almost nobody can see on a soft-edged background.
  */
 export class Surface {

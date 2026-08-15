@@ -1,31 +1,13 @@
-import type { Rng } from '../../util/rng.js';
-import { SIZE_RADIUS, resolveCount, type Amount, type Size } from '../../util/scalars.js';
+import type {
+  ISpawnOptions,
+  ISpawnResult,
+} from '../../model/layers/particle-field/spawn.interface.js';
+import { SIZE_RADIUS, resolveCount } from '../../util/scalars.js';
 import type { ParticleStore } from './store.js';
 
 /** Base drift range in CSS pixels per second, before the speed multiplier. */
 const DRIFT_MIN = 10;
 const DRIFT_MAX = 34;
-
-export interface SpawnOptions {
-  amount: Amount;
-  size: Size;
-  speed: number;
-  maxCount: number;
-  width: number;
-  height: number;
-  /** How many distinct colours the palette offers. */
-  colourCount: number;
-  rng: Rng;
-}
-
-export interface SpawnResult {
-  count: number;
-  /**
-   * Index boundaries between colour runs; length is `colourCount + 1`.
-   * Colour c occupies `[bounds[c], bounds[c + 1])`.
-   */
-  colourBounds: Int32Array;
-}
 
 /**
  * Fill the store with a fresh field.
@@ -35,7 +17,7 @@ export interface SpawnResult {
  * sorting anything per frame, and since nothing ever reorders the store, that
  * invariant holds for the lifetime of the field.
  */
-export function spawnField(store: ParticleStore, options: SpawnOptions): SpawnResult {
+export function spawnField(store: ParticleStore, options: ISpawnOptions): ISpawnResult {
   const { amount, size, speed, maxCount, width, height, rng } = options;
   const colourCount = Math.max(1, options.colourCount);
 

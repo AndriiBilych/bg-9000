@@ -1,10 +1,10 @@
 import type { Surface } from '../engine/surface.js';
 import type { ParticleStore } from '../layers/particle-field/store.js';
-import type { DrawGroup, Renderer } from './renderer.js';
+import type { IDrawGroup, IRenderer } from '../model/render/renderer.interface.js';
 
 const TAU = Math.PI * 2;
 
-export class Canvas2DRenderer implements Renderer {
+export class Canvas2DRenderer implements IRenderer {
   readonly kind = 'canvas2d';
 
   constructor(private readonly surface: Surface) {}
@@ -24,7 +24,7 @@ export class Canvas2DRenderer implements Renderer {
    * circles costs three fill calls rather than 460. `moveTo` before each `arc`
    * is what keeps the sub-paths from being joined by a connecting line.
    */
-  drawCircleGroups(store: ParticleStore, groups: readonly DrawGroup[]): void {
+  drawCircleGroups(store: ParticleStore, groups: readonly IDrawGroup[]): void {
     const ctx = this.surface.ctx;
     const { x, y, radius } = store;
 

@@ -1,48 +1,20 @@
+import type { IBackgroundConfig } from '../model/config/config.interface.js';
+import { DEFAULT_PALETTE, isPaletteName, type PaletteName } from '../theme/palettes.js';
+import { DEFAULT_STYLE, isCircleStyle, type CircleStyle } from '../theme/styles.js';
 import { isAmount, isSize, type Amount, type Size } from '../util/scalars.js';
 
-/** How a circle is painted. */
-export type CircleStyle = 'see-through' | 'dot' | 'full';
-
-export type PaletteName = 'midnight' | 'blossom' | 'mint' | 'dusk' | 'ember';
-
-export interface BackgroundConfig {
-  amount: Amount;
-  size: Size;
-  /** Circle-to-circle contact. Landing in M3; ignored until then. */
-  collisions: boolean;
-  /** Landing in M2; ignored until then. */
-  style: CircleStyle;
-  /** Landing in M2; ignored until then. */
-  palette: PaletteName;
-  /** Multiplier on drift velocity. */
-  speed: number;
-  /** Velocity damping. 0 disables the force entirely. */
-  drag: number;
-  /** Fraction of velocity retained on a wall bounce. */
-  restitution: number;
-  /** Hard ceiling on particle count, whatever the density says. */
-  maxCount: number;
-  /** Device pixel ratio ceiling. 2 is plenty for a soft background. */
-  maxDpr: number;
-  /** Fixed seed reproduces a layout exactly; omit for a random one. */
-  seed?: number;
-}
-
-export const DEFAULT_CONFIG: Readonly<BackgroundConfig> = {
+export const DEFAULT_CONFIG: Readonly<IBackgroundConfig> = {
   amount: 'moderate',
   size: 'medium',
   collisions: true,
-  style: 'see-through',
-  palette: 'mint',
+  style: DEFAULT_STYLE,
+  palette: DEFAULT_PALETTE,
   speed: 1,
   drag: 0,
   restitution: 1,
   maxCount: 1200,
   maxDpr: 2,
 };
-
-const STYLES: readonly CircleStyle[] = ['see-through', 'dot', 'full'];
-const PALETTES: readonly PaletteName[] = ['midnight', 'blossom', 'mint', 'dusk', 'ember'];
 
 function clamp(value: number, min: number, max: number, fallback: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
@@ -57,17 +29,17 @@ function clamp(value: number, min: number, max: number, fallback: number): numbe
  * are replaced rather than thrown on.
  */
 export function normaliseConfig(
-  patch: Partial<BackgroundConfig> | undefined,
-  base: Readonly<BackgroundConfig> = DEFAULT_CONFIG,
-): BackgroundConfig {
+  patch: Partial<IBackgroundConfig> | undefined,
+  base: Readonly<IBackgroundConfig> = DEFAULT_CONFIG,
+): IBackgroundConfig {
   const merged = { ...base, ...(patch ?? {}) };
 
   return {
     amount: isAmount(merged.amount) ? merged.amount : base.amount,
     size: isSize(merged.size) ? merged.size : base.size,
     collisions: Boolean(merged.collisions),
-    style: STYLES.includes(merged.style) ? merged.style : base.style,
-    palette: PALETTES.includes(merged.palette) ? merged.palette : base.palette,
+    style: isCircleStyle(merged.style) ? merged.style : base.style,
+    palette: isPaletteName(merged.palette) ? merged.palette : base.palette,
     speed: clamp(merged.speed, 0, 20, base.speed),
     drag: clamp(merged.drag, 0, 100, base.drag),
     restitution: clamp(merged.restitution, 0, 1, base.restitution),
@@ -78,3 +50,6 @@ export function normaliseConfig(
 }
 
 export type { Amount, Size };
+// Owned by the theme module — re-exported here so `IBackgroundConfig` and every
+// type it is built from can be imported from one place.
+export type { CircleStyle, PaletteName };

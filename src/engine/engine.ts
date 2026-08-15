@@ -1,48 +1,33 @@
-import { DEFAULT_CONFIG, normaliseConfig, type BackgroundConfig } from '../config/config.js';
-import type { Layer } from '../layers/layer.js';
+import { DEFAULT_CONFIG, normaliseConfig } from '../config/config.js';
 import { ParticleField } from '../layers/particle-field/particle-field.js';
+import type { IBackgroundConfig } from '../model/config/config.interface.js';
+import type { IBackground, IBackgroundStats } from '../model/engine/engine.interface.js';
+import type { ISceneContext } from '../model/engine/scene-context.interface.js';
+import type { ILayer } from '../model/layers/layer.interface.js';
+import type { IRenderer } from '../model/render/renderer.interface.js';
+import type { ITheme } from '../model/theme/theme.interface.js';
 import { Canvas2DRenderer } from '../render/canvas2d.js';
-import type { Renderer } from '../render/renderer.js';
+import { resolveTheme } from '../theme/theme.js';
 import { createRng } from '../util/rng.js';
 import { Clock } from './clock.js';
-import { createPointerState, type SceneContext } from './scene-context.js';
+import { createPointerState } from './scene-context.js';
 import { Surface } from './surface.js';
-
-export interface BackgroundStats {
-  /** Smoothed frames per second. */
-  fps: number;
-  /** Particles currently simulated. */
-  count: number;
-  /** Seconds in the last frame. */
-  dt: number;
-  running: boolean;
-}
-
-export interface Background {
-  readonly config: Readonly<BackgroundConfig>;
-  /** Apply a partial config. Rebuilds only what the change requires. */
-  update(patch: Partial<BackgroundConfig>): void;
-  pause(): void;
-  resume(): void;
-  getStats(): BackgroundStats;
-  /** Idempotent. Cancels the frame and detaches every observer and listener. */
-  dispose(): void;
-}
 
 export function createBackground(
   canvas: HTMLCanvasElement,
-  patch?: Partial<BackgroundConfig>,
-): Background {
+  patch?: Partial<IBackgroundConfig>,
+): IBackground {
   if (!(canvas instanceof HTMLCanvasElement)) {
     throw new TypeError('bg-9000: createBackground expects an HTMLCanvasElement.');
   }
 
   let config = normaliseConfig(patch, DEFAULT_CONFIG);
+  let theme: ITheme = resolveTheme(config.palette, config.style);
 
   const clock = new Clock(0.05);
   const pointer = createPointerState();
 
-  const ctx: SceneContext = {
+  const ctx: ISceneContext = {
     width: 0,
     height: 0,
     dpr: 1,
@@ -55,14 +40,14 @@ export function createBackground(
 
   // Declared ahead of `new Surface(...)`: the Surface constructor measures
   // immediately and invokes this callback synchronously, so anything it touches
-  // must already be initialised rather than sitting in the temporal dead zone.
+  // must already be initialised rather than sitting in the dead zone.
   let initialised = false;
   let running = false;
   let disposed = false;
   let raf = 0;
   let fps = 0;
 
-  const layers: Layer[] = [];
+  const layers: ILayer[] = [];
 
   const surface = new Surface(canvas, config.maxDpr, (width, height, dpr, prevWidth, prevHeight) => {
     ctx.width = width;
@@ -77,7 +62,7 @@ export function createBackground(
   ctx.height = surface.height;
   ctx.dpr = surface.dpr;
 
-  const renderer: Renderer = new Canvas2DRenderer(surface);
+  const renderer: IRenderer = new Canvas2DRenderer(surface);
 
   const field = new ParticleField({
     amount: config.amount,
@@ -86,6 +71,8 @@ export function createBackground(
     drag: config.drag,
     maxCount: config.maxCount,
     restitution: config.restitution,
+    collisions: config.collisions,
+    theme,
   });
   layers.push(field);
 
@@ -96,7 +83,7 @@ export function createBackground(
 
   function renderFrame(): void {
     if (disposed) return;
-    renderer.beginFrame(null);
+    renderer.beginFrame(theme.background);
     for (const layer of layers) layer.render(renderer, ctx);
     renderer.endFrame();
   }
@@ -146,17 +133,25 @@ export function createBackground(
   // --- public surface -----------------------------------------------------
 
   return {
-    get config(): Readonly<BackgroundConfig> {
+    get config(): Readonly<IBackgroundConfig> {
       return config;
     },
 
-    update(next: Partial<BackgroundConfig>): void {
+    get theme(): ITheme {
+      return theme;
+    },
+
+    update(next: Partial<IBackgroundConfig>): void {
       if (disposed) return;
       const previous = config;
       config = normaliseConfig(next, config);
 
       if (config.seed !== previous.seed) {
         ctx.rng = createRng(config.seed);
+      }
+
+      if (config.palette !== previous.palette || config.style !== previous.style) {
+        theme = resolveTheme(config.palette, config.style);
       }
 
       field.configure(
@@ -167,6 +162,8 @@ export function createBackground(
           drag: config.drag,
           maxCount: config.maxCount,
           restitution: config.restitution,
+          collisions: config.collisions,
+          theme,
         },
         ctx,
       );
@@ -177,8 +174,8 @@ export function createBackground(
     pause: stop,
     resume: start,
 
-    getStats(): BackgroundStats {
-      return { fps, count: field.count, dt: ctx.dt, running };
+    getStats(): IBackgroundStats {
+      return { fps, count: field.count, contacts: field.contactCount, dt: ctx.dt, running };
     },
 
     dispose(): void {

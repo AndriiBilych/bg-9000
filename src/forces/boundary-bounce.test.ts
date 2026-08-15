@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { createRng } from '../util/rng.js';
-import { createPointerState, type SceneContext } from '../engine/scene-context.js';
+import { createPointerState } from '../engine/scene-context.js';
 import { ParticleStore } from '../layers/particle-field/store.js';
+import type { ISceneContext } from '../model/engine/scene-context.interface.js';
 import { BoundaryBounce } from './boundary-bounce.js';
 
-function scene(width: number, height: number): SceneContext {
+function scene(width: number, height: number): ISceneContext {
   return {
     width,
     height,

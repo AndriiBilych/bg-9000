@@ -3,9 +3,8 @@
  *
  * An array of objects would be friendlier to read, but it costs a pointer
  * dereference per particle per field per frame, plus GC pressure from the
- * objects themselves. Flat typed arrays keep the hot loops linear over memory
- * and — because they are transferable — leave the door open to running the
- * simulation in a worker later.
+ * objects themselves. Flat typed arrays keep the hot loops linear over memory,
+ * and being transferable they can cross a worker boundary without a copy.
  *
  * Capacity is fixed at construction. Nothing here allocates per frame.
  */

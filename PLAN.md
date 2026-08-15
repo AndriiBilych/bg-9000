@@ -12,7 +12,7 @@ A framework-agnostic canvas background library, built here and consumed by
 | v0.1 layer | `ParticleField` |
 | Milestones | 5 |
 
-**Status:** M1 complete. M2 next.
+**Status:** M1–M3 complete. M4 next.
 
 ---
 
@@ -34,10 +34,10 @@ appear in a v0.1.
 ### Built now because retrofitting is expensive
 
 - Two-phase simulation pipeline (see the note under M1 — this diverged from the original plan)
-- `Layer` interface — the seam that later holds sine lines and pulse rings
-- `Renderer` interface, batch-shaped so a WebGL backend stays possible
+- `ILayer` interface — the seam that later holds sine lines and pulse rings
+- `IRenderer` interface, batch-shaped so a WebGL backend stays possible
 - Structure-of-arrays particle store on typed arrays
-- `SceneContext.pointer`, stubbed inert — so layers written now already read from the right place
+- `ISceneContext.pointer`, stubbed inert — so layers written now already read from the right place
 
 ### Deferred
 
@@ -54,42 +54,61 @@ appear in a v0.1.
 Files are small and each maps to one concept. The `engine` knows nothing about
 circles; `particle-field` knows nothing about the DOM.
 
+Interfaces live apart from the code that implements them, under `src/model`,
+in files named `*.interface.ts` and named with an `I` prefix. The tree there
+mirrors the tree beside it, so `IRenderer` is at
+`model/render/renderer.interface.ts` and its implementation is at
+`render/canvas2d.ts`.
+
 ```
 bg-9000/
 ├─ package.json · tsconfig.json · vite.config.ts · vitest.config.ts
 ├─ scripts/screenshot.mjs        Playwright visual check
 ├─ src/
 │  ├─ index.ts                   public barrel
+│  ├─ model/                     every interface, mirroring the layout below
+│  │  ├─ engine/
+│  │  │  ├─ engine.interface.ts          IBackground, IBackgroundStats
+│  │  │  └─ scene-context.interface.ts   ISceneContext, IPointerState
+│  │  ├─ config/config.interface.ts      IBackgroundConfig
+│  │  ├─ layers/
+│  │  │  ├─ layer.interface.ts           ILayer
+│  │  │  └─ particle-field/
+│  │  │     ├─ particle-field.interface.ts  IParticleFieldOptions
+│  │  │     └─ spawn.interface.ts           ISpawnOptions, ISpawnResult
+│  │  ├─ forces/force.interface.ts       IForce, IConstraint
+│  │  ├─ render/renderer.interface.ts    IRenderer, IDrawGroup
+│  │  ├─ theme/
+│  │  │  ├─ theme.interface.ts           ITheme, IColourVariant
+│  │  │  ├─ palettes.interface.ts        IPalette
+│  │  │  └─ styles.interface.ts          IStyleSpec
+│  │  └─ util/rng.interface.ts           IRng
 │  ├─ engine/
 │  │  ├─ engine.ts               createBackground(), loop, lifecycle, dispose
 │  │  ├─ clock.ts                dt, clamping, elapsed
 │  │  ├─ surface.ts              DPR cap, ResizeObserver, canvas sizing
-│  │  └─ scene-context.ts        SceneContext (size, time, pointer stub)
-│  ├─ layers/
-│  │  ├─ layer.ts                Layer interface
-│  │  └─ particle-field/
-│  │     ├─ particle-field.ts    the Layer implementation
-│  │     ├─ store.ts             SoA ParticleStore (typed arrays)
-│  │     ├─ spawn.ts             amount/size resolution + seeding
-│  │     └─ collision.ts         uniform-grid broadphase + impulse resolve  [M3]
+│  │  └─ scene-context.ts        createPointerState()
+│  ├─ layers/particle-field/
+│  │  ├─ particle-field.ts       the ILayer implementation
+│  │  ├─ store.ts                SoA ParticleStore (typed arrays)
+│  │  ├─ spawn.ts                amount/size resolution + seeding
+│  │  └─ collision.ts            uniform-grid broadphase + impulse resolve
 │  ├─ forces/
-│  │  ├─ force.ts                Force + Constraint interfaces
 │  │  ├─ drag.ts
 │  │  └─ boundary-bounce.ts
-│  ├─ render/
-│  │  ├─ renderer.ts             batched Renderer interface
-│  │  └─ canvas2d.ts             Canvas2D backend
-│  ├─ theme/                                                                [M2]
-│  │  ├─ theme.ts                Theme types, resolveTheme()
+│  ├─ render/canvas2d.ts         Canvas2D backend
+│  ├─ theme/
+│  │  ├─ theme.ts                resolveTheme(), variantCount()
 │  │  ├─ palettes.ts             the five colour schemes
 │  │  └─ styles.ts               see-through | dot | full
 │  ├─ config/
-│  │  ├─ config.ts               public config types + defaults + validation
-│  │  └─ presets.ts              named presets                              [M2]
+│  │  ├─ config.ts               defaults + validation
+│  │  └─ presets.ts              named presets
 │  └─ util/
 │     ├─ rng.ts                  seeded PRNG
 │     └─ scalars.ts              enum → number resolution
 └─ examples/vanilla/             dev playground with live controls + FPS meter
+   └─ gallery.html               contact sheet: every palette × every style
 ```
 
 ---
@@ -229,7 +248,7 @@ v0.1 needs.
 > A pre-rasterised sprite atlas was considered and rejected for v0.1. It earns
 > its keep at thousands of elements and for custom images — neither is true at
 > this scale, where grouped paths are simpler and fast enough. The atlas arrives
-> with sprite support; the `Renderer` interface is what keeps that door open.
+> with sprite support; the `IRenderer` interface is what keeps that door open.
 
 ---
 
@@ -253,7 +272,7 @@ v0.1 needs.
 ### 1. Engine skeleton ✅
 
 - Repo scaffold: TypeScript strict, Vite lib mode, Vitest
-- `surface`, `clock`, `Layer`, `SceneContext`, simulation pipeline
+- `surface`, `clock`, `ILayer`, `ISceneContext`, simulation pipeline
 - SoA store, spawn from amount/size, Canvas2D backend
 - `examples/vanilla` playground with live controls and an FPS meter
 
@@ -261,34 +280,65 @@ v0.1 needs.
 Build is 4.88 kB gzipped; 16 tests pass.
 
 > **Deviation from the original plan.** The single force accumulator was split
-> into `Force` (contributes acceleration, composes by summation) and
-> `Constraint` (corrects position after integration). Boundary bouncing is not a
+> into `IForce` (contributes acceleration, composes by summation) and
+> `IConstraint` (corrects position after integration). Boundary bouncing is not a
 > force — expressing it as one makes it a spring, and springy walls let fast
 > particles escape the viewport entirely. Collisions in M3 are a constraint too,
 > so the split pays for itself immediately. Same amount of code; it just stops
 > the pipeline lying about what wall handling is.
 
-### 2. Colour
+### 2. Colour ✅
 
 - Theme types, `resolveTheme()`, the five palettes, the three styles
 - Per-particle colour index; grouped-path rendering
-- All controls wired in the playground
+- Named presets: `whisper`, `bubbles`, `dust`, `nebula`, `hearth`
+- All controls wired in the playground, plus a contact-sheet page
 
-**Output:** 15 style × palette combinations reviewable side by side.
+**Delivered.** All fifteen combinations render live and side by side at
+`/gallery.html`. Build is 6.35 kB gzipped; 33 tests pass.
 
-### 3. Collisions
+> **Decision: variant count comes from the palette, never the style.**
+> `see-through` only needs the outlines and `dot` only the fills, so resolving a
+> variant per *used* array would have been the obvious move. It also would have
+> made the number of colour runs depend on the style — and since a run is fixed
+> at spawn, toggling style would have respawned the field. A repaint that makes
+> every circle jump is not a repaint. Holding the count at the palette's widest
+> array costs one duplicated path call per frame for the styles that use the
+> shorter one, and buys a style toggle that only changes colours.
+
+### 3. Collisions ✅
 
 - Uniform grid, half-neighbourhood sweep, impulse resolve
-- Toggle, and the coverage guard on spawn
+- Toggle, and the coverage guard on spawn (the guard itself landed in M1)
 
-**Output:** stable collisions at every amount × size combination.
+**Delivered.** No visible interpenetration at `alot` + `large`, where the same
+field with contacts off overlaps constantly. Build is 7.92 kB gzipped; 47 tests
+pass.
+
+> **The broadphase fails silently, so it is tested against brute force.** A
+> missed pair is not a crash — it is one circle quietly sliding through
+> another, at a rate low enough to look like a rendering artefact. The grid is
+> therefore checked against an all-pairs sweep over a real field at every size,
+> asserting the counts match exactly: too few means a missed contact, too many
+> means a pair visited twice and given a double impulse. Comparing the two at
+> all needs the resolve suppressed — the solver moves circles as it sweeps, so
+> pairs found late in a frame are not the pairs a snapshot taken beforehand
+> would list. Setting `invMass` to zero makes contact resolution a no-op while
+> detection still runs.
+
+> **Cells are `2 × maxRadius` and never smaller.** The first draft derived the
+> cell width as `width / cols` after rounding `cols` up, which makes cells
+> *narrower* than the radius bound and quietly breaks the guarantee the whole
+> half-neighbourhood argument rests on. Larger cells are merely slower; smaller
+> ones lose contacts.
 
 ### 4. Hardening
 
 - The outstanding rows of the engine-hardening table
-- Vitest: scalar resolution, theme resolution, collision separation and energy
-  bounds, `dispose()` leaves nothing attached
-- README with the API and a palette reference
+- Vitest: `dispose()` leaves nothing attached (scalar resolution, theme
+  resolution, and collision separation and energy bounds are already covered)
+- README with the API and a palette reference — mostly written as M2 and M3
+  landed; M4 adds whatever hardening changes
 
 **Output:** v0.1.0, ready to publish.
 
@@ -348,7 +398,7 @@ export class BackgroundComponent {
   readonly palette = input<PaletteName>('mint');
   readonly collisions = input(true);
 
-  private bg?: Background;
+  private bg?: IBackground;
 
   constructor() {
     const zone = inject(NgZone);

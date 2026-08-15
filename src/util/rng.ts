@@ -1,20 +1,12 @@
+import type { IRng } from '../model/util/rng.interface.js';
+
 /**
  * Seeded pseudo-random source (mulberry32).
  *
  * Deterministic layouts matter for two reasons: screenshots of a given preset
  * stay identical between runs, and collision tests can reproduce a failure.
  */
-export interface Rng {
-  /** Uniform in [0, 1). */
-  next(): number;
-  /** Uniform in [min, max). */
-  range(min: number, max: number): number;
-  /** Integer in [0, maxExclusive). */
-  int(maxExclusive: number): number;
-  readonly seed: number;
-}
-
-export function createRng(seed: number = (Math.random() * 0x1_0000_0000) >>> 0): Rng {
+export function createRng(seed: number = (Math.random() * 0x1_0000_0000) >>> 0): IRng {
   let state = seed >>> 0;
 
   const next = (): number => {
