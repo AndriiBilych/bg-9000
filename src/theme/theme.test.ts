@@ -1,9 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import { normaliseConfig } from '../config/config.js';
 import { PRESETS, PRESET_NAMES, resolvePreset } from '../config/presets.js';
-import { PALETTES, PALETTE_NAMES } from './palettes.js';
+import type { ICustomPalette } from '../model/theme/palettes.interface.js';
+import {
+  CUSTOM_VARIANTS,
+  PALETTES,
+  PALETTE_NAMES,
+  expandCustomPalette,
+  isCustomPalette,
+} from './palettes.js';
 import { STYLES, STYLE_NAMES } from './styles.js';
 import { resolveTheme, variantCount } from './theme.js';
+
+const CUSTOM: ICustomPalette = {
+  background: '#0B0B10',
+  fill: '#243447',
+  outline: '#8FD6E8',
+};
 
 describe('palettes', () => {
   it('carries a background, fills and outlines for all five schemes', () => {
@@ -80,10 +93,16 @@ describe('resolveTheme', () => {
     }
   });
 
-  /** And the stock palettes agree, so a palette swap is a repaint too. */
-  it('gives every stock palette the same variant count', () => {
+  /**
+   * And every palette in the library agrees — stock or custom — so a palette
+   * swap is a repaint too. This is the assertion that keeps the respawn branch
+   * in ParticleField.configure unreachable; break it and the field jumps.
+   */
+  it('gives every palette the same variant count, custom included', () => {
     const counts = PALETTE_NAMES.map((name) => variantCount(PALETTES[name]));
     expect(new Set(counts)).toEqual(new Set([3]));
+    expect(CUSTOM_VARIANTS).toBe(counts[0]);
+    expect(variantCount(expandCustomPalette(CUSTOM))).toBe(counts[0]);
   });
 
   it('carries the style line width, and none for a style with no outline', () => {
@@ -134,5 +153,90 @@ describe('presets', () => {
     const resolved = resolvePreset('dust', { palette: 'ember' });
     expect(resolved.palette).toBe('ember');
     expect(resolved.size).toBe(PRESETS.dust.size);
+  });
+});
+
+describe('custom palettes', () => {
+  it('accepts three colours, one per role', () => {
+    expect(isCustomPalette(CUSTOM)).toBe(true);
+  });
+
+  it('demands all three: half a scheme is not a scheme', () => {
+    expect(isCustomPalette({ background: '#0B0B10', fill: '#243447' })).toBe(false);
+    expect(isCustomPalette({ ...CUSTOM, outline: 'not-a-colour' })).toBe(false);
+    expect(isCustomPalette({ ...CUSTOM, background: 42 })).toBe(false);
+    expect(isCustomPalette(null)).toBe(false);
+    expect(isCustomPalette('mint')).toBe(false);
+  });
+
+  it('paints the caller colours under every style', () => {
+    const theme = resolveTheme(CUSTOM, 'full');
+
+    expect(theme.palette).toBe('custom');
+    expect(theme.background).toBe(CUSTOM.background);
+    for (const v of theme.variants) {
+      expect(v.fill).toBe(CUSTOM.fill);
+      expect(v.stroke).toBe(CUSTOM.outline);
+    }
+
+    expect(resolveTheme(CUSTOM, 'dot').variants[0].stroke).toBeNull();
+    expect(resolveTheme(CUSTOM, 'see-through').variants[0].fill).toBeNull();
+  });
+
+  it('makes as many colour runs as a stock palette, so a swap never respawns', () => {
+    for (const style of STYLE_NAMES) {
+      expect(resolveTheme(CUSTOM, style).variants.length).toBe(
+        resolveTheme('mint', style).variants.length,
+      );
+    }
+  });
+
+  it('resolves fresh rather than growing the stock cache', () => {
+    expect(resolveTheme(CUSTOM, 'full')).not.toBe(resolveTheme(CUSTOM, 'full'));
+    expect(resolveTheme('mint', 'full')).toBe(resolveTheme('mint', 'full'));
+  });
+});
+
+describe('custom palette config', () => {
+  it('carries a valid custom palette through', () => {
+    const config = normaliseConfig({ palette: CUSTOM });
+    expect(config.palette).toEqual(CUSTOM);
+  });
+
+  it('trims the colours it stores', () => {
+    const config = normaliseConfig({ palette: { ...CUSTOM, fill: '  #243447  ' } });
+    expect(config.palette).toEqual(CUSTOM);
+  });
+
+  it('falls back to the base when any one colour is bad', () => {
+    for (const bad of [
+      { ...CUSTOM, fill: 'not-a-colour' },
+      { ...CUSTOM, background: '' },
+      { background: '#0B0B10', fill: '#243447' },
+    ]) {
+      expect(normaliseConfig({ palette: bad as never }).palette).toBe('mint');
+    }
+  });
+
+  /**
+   * The identity that keeps a colour picker cheap: the engine re-resolves on
+   * `config.palette !== previous.palette`, so an unchanged custom palette must
+   * come back as the same object however many literals get pushed at it.
+   */
+  it('hands back the previous object when the colours have not moved', () => {
+    const base = normaliseConfig({ palette: CUSTOM });
+    const again = normaliseConfig({ palette: { ...CUSTOM } }, base);
+
+    expect(again.palette).toBe(base.palette);
+    expect(normaliseConfig({ palette: { ...CUSTOM, fill: '#000000' } }, base).palette).not.toBe(
+      base.palette,
+    );
+  });
+
+  it('lets a stock name replace a custom palette and back again', () => {
+    const custom = normaliseConfig({ palette: CUSTOM });
+    const named = normaliseConfig({ palette: 'ember' }, custom);
+    expect(named.palette).toBe('ember');
+    expect(normaliseConfig({ palette: CUSTOM }, named).palette).toEqual(CUSTOM);
   });
 });

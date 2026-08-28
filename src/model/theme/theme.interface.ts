@@ -1,4 +1,4 @@
-import type { PaletteName } from '../../theme/palettes.js';
+import type { PaletteId } from '../../theme/palettes.js';
 import type { CircleStyle } from '../../theme/styles.js';
 
 /**
@@ -15,7 +15,8 @@ export interface IColourVariant {
 }
 
 export interface ITheme {
-  readonly palette: PaletteName;
+  /** One of the five names, or `'custom'` when the caller supplied colours. */
+  readonly palette: PaletteId;
   readonly style: CircleStyle;
   /** Canvas background. Painted once per frame, before the circles. */
   readonly background: string;

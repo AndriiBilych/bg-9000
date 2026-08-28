@@ -1,6 +1,11 @@
-import type { IPalette } from '../model/theme/palettes.interface.js';
+import type { ICustomPalette, IPalette } from '../model/theme/palettes.interface.js';
 import type { IColourVariant, ITheme } from '../model/theme/theme.interface.js';
-import { PALETTES, type PaletteName } from './palettes.js';
+import {
+  PALETTES,
+  expandCustomPalette,
+  isCustomPalette,
+  type PaletteName,
+} from './palettes.js';
 import { STYLES, type CircleStyle } from './styles.js';
 
 /**
@@ -17,19 +22,35 @@ export function variantCount(palette: IPalette): number {
   return Math.max(palette.fills.length, palette.outlines.length);
 }
 
-// Fifteen combinations exist in total and every one of them is immutable, so
-// resolution happens at most fifteen times per process. Colours never resolve
-// per frame, and after the first switch they do not resolve per config change
-// either.
+// Fifteen combinations of stock palette and style exist in total and every one
+// of them is immutable, so resolution happens at most fifteen times per process.
+// Colours never resolve per frame, and after the first switch they do not
+// resolve per config change either.
+//
+// Custom palettes are deliberately left out. Keying them by their colours is
+// what a cache would have to do, and an app driving a colour picker would then
+// grow this map without bound. Resolving one afresh builds four small objects,
+// and `normalisePalette` already keeps the engine from asking twice for a
+// palette that has not actually changed.
 const cache = new Map<string, ITheme>();
 
 /** Resolve a palette and style into flat, render-ready colours. */
-export function resolveTheme(palette: PaletteName, style: CircleStyle): ITheme {
+export function resolveTheme(
+  palette: PaletteName | ICustomPalette,
+  style: CircleStyle,
+): ITheme {
+  if (isCustomPalette(palette)) return build(expandCustomPalette(palette), style);
+
   const key = `${palette}:${style}`;
   const hit = cache.get(key);
   if (hit) return hit;
 
-  const scheme = PALETTES[palette];
+  const theme = build(PALETTES[palette], style);
+  cache.set(key, theme);
+  return theme;
+}
+
+function build(scheme: IPalette, style: CircleStyle): ITheme {
   const spec = STYLES[style];
   const count = variantCount(scheme);
 
@@ -44,13 +65,10 @@ export function resolveTheme(palette: PaletteName, style: CircleStyle): ITheme {
     );
   }
 
-  const theme: ITheme = Object.freeze({
-    palette,
+  return Object.freeze({
+    palette: scheme.name,
     style,
     background: scheme.background,
     variants: Object.freeze(variants),
   });
-
-  cache.set(key, theme);
-  return theme;
 }

@@ -61,7 +61,7 @@ own content.
 | `maxDpr` | `number` | `2` | Device pixel ratio cap |
 | `seed` | `number?` | — | Fixed seed reproduces a layout exactly |
 | `style` | `'see-through' \| 'dot' \| 'full'` | `'see-through'` | Outline only, fill only, or both |
-| `palette` | `PaletteName` | `'mint'` | Background, fills and outlines as a set |
+| `palette` | `PaletteName \| ICustomPalette` | `'mint'` | Background, fills and outlines as a set, or your own three colours |
 | `collisions` | `boolean` | `true` | Circle-to-circle contact; off removes the stage entirely |
 
 Unknown values fall back to the default rather than throwing: a background is
@@ -113,6 +113,33 @@ createBackground(canvas, resolvePreset('dust', { palette: 'ember' }));
 
 Presets are plain partial configs — `whisper`, `bubbles`, `dust`, `nebula`,
 `hearth` — so anything they express is overridable field by field.
+
+### Your own colours
+
+`palette` also takes three colours, one per role:
+
+```ts
+createBackground(canvas, {
+  palette: { background: '#0B0B10', fill: '#243447', outline: '#8FD6E8' },
+  style: 'full',
+});
+```
+
+Any CSS colour the canvas accepts will do — hex, `rgb()`, `hsl()`, or a keyword.
+All three fields are required, because a palette is only correct as a unit; a
+partial or malformed one falls back to the palette already in use rather than
+mixing half a scheme with half of the default.
+
+One fill and one outline means a custom field is flat where a stock one varies
+across three. It still resolves to three colour runs internally, matching every
+stock palette, so switching to and from a custom palette is a repaint and the
+field never jumps — it costs two draw calls a frame that paint the same colour,
+which is the same trade already made for style.
+
+`bg.theme.palette` reads `'custom'`, and `bg.config.palette` gives the colours
+back. Passing an unchanged custom palette is free: `normaliseConfig` returns the
+previous object, so nothing re-resolves. Driving the three colours from a colour
+picker on every input event is fine.
 
 ## Collisions
 

@@ -4,13 +4,18 @@ import {
   PRESET_NAMES,
   STYLE_NAMES,
   createBackground,
+  isCustomPalette,
   type Amount,
   type CircleStyle,
   type IBackgroundConfig,
+  type ICustomPalette,
   type PaletteName,
   type PresetName,
   type Size,
 } from 'bg-9000';
+
+/** The palette select carries the stock names plus one entry for your own. */
+const CUSTOM = 'custom';
 
 function el<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -32,6 +37,10 @@ const amount = el<HTMLSelectElement>('amount');
 const size = el<HTMLSelectElement>('size');
 const style = el<HTMLSelectElement>('style');
 const palette = el<HTMLSelectElement>('palette');
+const custom = el('custom');
+const customBackground = el<HTMLInputElement>('customBackground');
+const customFill = el<HTMLInputElement>('customFill');
+const customOutline = el<HTMLInputElement>('customOutline');
 const speed = el<HTMLInputElement>('speed');
 const drag = el<HTMLInputElement>('drag');
 const restitution = el<HTMLInputElement>('restitution');
@@ -60,7 +69,23 @@ const bg = createBackground(canvas, {
 
 options(preset, ['—', ...PRESET_NAMES], '—');
 options(style, STYLE_NAMES, bg.config.style);
-options(palette, PALETTE_NAMES, bg.config.palette);
+options(palette, [...PALETTE_NAMES, CUSTOM], 'mint');
+
+/**
+ * The palette to send: a stock name, or the three pickers read as a set.
+ *
+ * A fresh object literal on every drag frame is fine — `normaliseConfig` hands
+ * back the previous one when the colours have not moved, so an unchanged
+ * palette never re-resolves a theme.
+ */
+function readPalette(): PaletteName | ICustomPalette {
+  if (palette.value !== CUSTOM) return palette.value as PaletteName;
+  return {
+    background: customBackground.value,
+    fill: customFill.value,
+    outline: customOutline.value,
+  };
+}
 
 function paintSwatches(): void {
   const { theme } = bg;
@@ -89,12 +114,13 @@ function push(): void {
   speedOut.value = Number(speed.value).toFixed(1);
   dragOut.value = Number(drag.value).toFixed(2);
   restOut.value = Number(restitution.value).toFixed(2);
+  custom.hidden = palette.value !== CUSTOM;
 
   bg.update({
     amount: amount.value as Amount,
     size: size.value as Size,
     style: style.value as CircleStyle,
-    palette: palette.value as PaletteName,
+    palette: readPalette(),
     speed: Number(speed.value),
     drag: Number(drag.value),
     restitution: Number(restitution.value),
@@ -109,14 +135,33 @@ function sync(config: Readonly<IBackgroundConfig>): void {
   amount.value = config.amount;
   size.value = config.size;
   style.value = config.style;
-  palette.value = config.palette;
+  if (isCustomPalette(config.palette)) {
+    palette.value = CUSTOM;
+    customBackground.value = config.palette.background;
+    customFill.value = config.palette.fill;
+    customOutline.value = config.palette.outline;
+  } else {
+    palette.value = config.palette;
+  }
   speed.value = String(config.speed);
   drag.value = String(config.drag);
   restitution.value = String(config.restitution);
   collisions.checked = config.collisions;
 }
 
-for (const control of [amount, size, style, palette, speed, drag, restitution, collisions]) {
+for (const control of [
+  amount,
+  size,
+  style,
+  palette,
+  customBackground,
+  customFill,
+  customOutline,
+  speed,
+  drag,
+  restitution,
+  collisions,
+]) {
   control.addEventListener('input', () => {
     preset.value = '—';
     push();

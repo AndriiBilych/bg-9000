@@ -1,5 +1,6 @@
 import type { IBackgroundConfig } from '../model/config/config.interface.js';
-import { DEFAULT_PALETTE, isPaletteName, type PaletteName } from '../theme/palettes.js';
+import type { ICustomPalette } from '../model/theme/palettes.interface.js';
+import { DEFAULT_PALETTE, normalisePalette, type PaletteName } from '../theme/palettes.js';
 import { DEFAULT_STYLE, isCircleStyle, type CircleStyle } from '../theme/styles.js';
 import { isAmount, isSize, type Amount, type Size } from '../util/scalars.js';
 
@@ -39,7 +40,7 @@ export function normaliseConfig(
     size: isSize(merged.size) ? merged.size : base.size,
     collisions: Boolean(merged.collisions),
     style: isCircleStyle(merged.style) ? merged.style : base.style,
-    palette: isPaletteName(merged.palette) ? merged.palette : base.palette,
+    palette: normalisePalette(merged.palette, base.palette),
     speed: clamp(merged.speed, 0, 20, base.speed),
     drag: clamp(merged.drag, 0, 100, base.drag),
     restitution: clamp(merged.restitution, 0, 1, base.restitution),
@@ -52,4 +53,4 @@ export function normaliseConfig(
 export type { Amount, Size };
 // Owned by the theme module — re-exported here so `IBackgroundConfig` and every
 // type it is built from can be imported from one place.
-export type { CircleStyle, PaletteName };
+export type { CircleStyle, ICustomPalette, PaletteName };

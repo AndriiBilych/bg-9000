@@ -128,6 +128,28 @@ describe('ParticleField colouring', () => {
     expect(draw(field, ctx)[0].stroke).toBe('#F2A68F');
   });
 
+  /**
+   * A custom palette carries one fill and one outline, and is padded out to the
+   * stock variant count precisely so that this holds. If it ever resolved to a
+   * different number of runs, `configure` would respawn and the field would
+   * jump on every switch into a custom theme.
+   */
+  it('changes to a custom palette without moving a single circle', () => {
+    const ctx = scene();
+    const field = new ParticleField(options());
+    field.init(ctx);
+
+    const before = positions(field, ctx);
+    const custom = { background: '#0B0B10', fill: '#243447', outline: '#8FD6E8' };
+    field.configure(options({ theme: resolveTheme(custom, 'full') }), ctx);
+
+    expect(positions(field, ctx)).toEqual(before);
+    for (const group of draw(field, ctx)) {
+      expect(group.fill).toBe(custom.fill);
+      expect(group.stroke).toBe(custom.outline);
+    }
+  });
+
   it('resolves contacts only when collisions are on', () => {
     const ctx = scene();
     ctx.dt = 1 / 60;

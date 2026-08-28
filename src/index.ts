@@ -1,13 +1,24 @@
 export { createBackground } from './engine/engine.js';
 
 export { DEFAULT_CONFIG, normaliseConfig } from './config/config.js';
-export type { CircleStyle, PaletteName } from './config/config.js';
+export type { CircleStyle, ICustomPalette, PaletteName } from './config/config.js';
 
 export { PRESETS, PRESET_NAMES, isPresetName, resolvePreset } from './config/presets.js';
 export type { PresetName } from './config/presets.js';
 
 export { resolveTheme, variantCount } from './theme/theme.js';
-export { PALETTES, PALETTE_NAMES, DEFAULT_PALETTE, isPaletteName } from './theme/palettes.js';
+export {
+  PALETTES,
+  PALETTE_NAMES,
+  DEFAULT_PALETTE,
+  CUSTOM_VARIANTS,
+  isPaletteName,
+  isCustomPalette,
+  expandCustomPalette,
+  normalisePalette,
+} from './theme/palettes.js';
+export type { PaletteId } from './theme/palettes.js';
+export { isColour } from './theme/colour.js';
 export { STYLES, STYLE_NAMES, DEFAULT_STYLE, isCircleStyle } from './theme/styles.js';
 
 export type { Amount, Size } from './util/scalars.js';

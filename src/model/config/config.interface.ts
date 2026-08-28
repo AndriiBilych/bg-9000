@@ -1,6 +1,7 @@
 import type { PaletteName } from '../../theme/palettes.js';
 import type { CircleStyle } from '../../theme/styles.js';
 import type { Amount, Size } from '../../util/scalars.js';
+import type { ICustomPalette } from '../theme/palettes.interface.js';
 
 export interface IBackgroundConfig {
   amount: Amount;
@@ -9,8 +10,11 @@ export interface IBackgroundConfig {
   collisions: boolean;
   /** Fill, outline, or both. */
   style: CircleStyle;
-  /** Background, fills and outlines, chosen as a set. */
-  palette: PaletteName;
+  /**
+   * Background, fills and outlines, chosen as a set — one of the five stock
+   * names, or your own three colours.
+   */
+  palette: PaletteName | ICustomPalette;
   /** Multiplier on drift velocity. */
   speed: number;
   /** Velocity damping. 0 disables the force entirely. */
