@@ -1,5 +1,5 @@
-import type { IBackgroundConfig } from '../model/config/config.interface.js';
-import { normaliseConfig } from './config.js';
+import type { IBackgroundConfig } from '../model/config/config.interface';
+import { normaliseConfig } from './config';
 
 /**
  * Named starting points.

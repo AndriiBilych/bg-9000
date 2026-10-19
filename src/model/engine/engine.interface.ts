@@ -1,10 +1,11 @@
-import type { IBackgroundConfig } from '../config/config.interface.js';
-import type { ITheme } from '../theme/theme.interface.js';
+import type { IBackgroundConfig } from '../config/config.interface';
+import type { ILayer } from '../layers/layer.interface';
+import type { ITheme } from '../theme/theme.interface';
 
 export interface IBackgroundStats {
   /** Smoothed frames per second. */
   fps: number;
-  /** Particles currently simulated. */
+  /** Particles currently simulated; 0 when the field is off. */
   count: number;
   /** Overlapping pairs resolved on the last step; 0 when collisions are off. */
   contacts: number;
@@ -13,7 +14,7 @@ export interface IBackgroundStats {
   running: boolean;
 }
 
-export interface IBackground {  
+export interface IBackground {
   readonly config: Readonly<IBackgroundConfig>;
   /**
    * The resolved colours currently in use. Exposed so a host page can match its
@@ -23,6 +24,14 @@ export interface IBackground {
   readonly theme: ITheme;
   /** Apply a partial config. Rebuilds only what the change requires. */
   update(patch: Partial<IBackgroundConfig>): void;
+  /**
+   * Append a layer. Sugar for `update({ layers: [...config.layers, layer] })`,
+   * so `config.layers` stays the single record of what is in the stack. Adding
+   * a layer already present is a no-op.
+   */
+  addLayer(layer: ILayer): void;
+  /** Remove and dispose a layer. Unknown layers are ignored. */
+  removeLayer(layer: ILayer): void;
   pause(): void;
   resume(): void;
   getStats(): IBackgroundStats;

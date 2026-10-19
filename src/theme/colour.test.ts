@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isColour } from './colour.js';
+import { isColour } from './colour';
 
 describe('isColour', () => {
   it('accepts hex at every length', () => {

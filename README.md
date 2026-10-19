@@ -3,8 +3,9 @@
 Framework-agnostic animated canvas backgrounds. No React, no Angular, no DOM
 framework of any kind — just a canvas element and a config object.
 
-> **Status: v0.1 / M3.** A field of drifting, colliding circles with amount,
-> size, style and palette options. M4 is hardening.
+> **Status: v0.1** A field of drifting, colliding shapes with amount,
+> size, style, palette and shape options — plus custom shapes and custom
+> layers on the same engine.
 
 ## Usage
 
@@ -16,6 +17,7 @@ const bg = createBackground(document.querySelector('canvas')!, {
   size: 'medium',            // 'small' | 'medium' | 'large'
   style: 'see-through',      // 'see-through' | 'dot' | 'full'
   palette: 'mint',           // 'midnight' | 'blossom' | 'mint' | 'dusk' | 'ember'
+  shape: 'circle',           // 'circle' | 'square' | 'triangle' | 'hexagon' | 'star' | 'heart'
   collisions: true,
   speed: 1,
 });
@@ -61,8 +63,12 @@ own content.
 | `maxDpr` | `number` | `2` | Device pixel ratio cap |
 | `seed` | `number?` | — | Fixed seed reproduces a layout exactly |
 | `style` | `'see-through' \| 'dot' \| 'full'` | `'see-through'` | Outline only, fill only, or both |
-| `palette` | `PaletteName \| ICustomPalette` | `'mint'` | Background, fills and outlines as a set, or your own three colours |
-| `collisions` | `boolean` | `true` | Circle-to-circle contact; off removes the stage entirely |
+| `palette` | `PaletteName \| ICustomPalette` | `'mint'` | Background, fills and outlines as a set, or custom three colours |
+| `shape` | `ShapeName \| IShape` | `'circle'` | What each particle looks like — a built-in, or [custom](#shapes) |
+| `collisions` | `boolean` | `true` | Particle-to-particle contact; off removes the stage entirely |
+| `particles` | `boolean` | `true` | The built-in field itself; off removes the layer, leaving only [custom layers](#custom-layers) |
+| `layers` | `ILayer[]` | `[]` | [Custom layers](#custom-layers), in draw order |
+| `pointer` | `boolean` | `true` | Track the pointer on `window` and publish it to layers; off attaches nothing |
 
 Unknown values fall back to the default rather than throwing: a background is
 decoration, and taking a page down over a typo in a colour name is the wrong
@@ -114,7 +120,7 @@ createBackground(canvas, resolvePreset('dust', { palette: 'ember' }));
 Presets are plain partial configs — `whisper`, `bubbles`, `dust`, `nebula`,
 `hearth` — so anything they express is overridable field by field.
 
-### Your own colours
+### Custom colours
 
 `palette` also takes three colours, one per role:
 
@@ -141,6 +147,171 @@ back. Passing an unchanged custom palette is free: `normaliseConfig` returns the
 previous object, so nothing re-resolves. Driving the three colours from a colour
 picker on every input event is fine.
 
+## Shapes
+
+`shape` picks what each particle of the field looks like. Six are built in —
+`circle`, `square`, `triangle`, `hexagon`, `star`, `heart` — and all of them
+cost exactly what circles cost: one path per colour run, three fills a frame.
+Switching shape is a repaint; nothing moves.
+
+```ts
+createBackground(canvas, { shape: 'star', palette: 'dusk', style: 'dot' });
+bg.update({ shape: 'heart' });
+```
+
+### Custom shapes
+
+A shape is a name and one of two functions. `defineShape` builds one:
+
+```ts
+import { defineShape } from 'bg-9000';
+
+// trace: add the outline to a path the renderer has already opened. The
+// renderer fills and strokes once per colour run, so this is as cheap as
+// a circle. Begin with moveTo, close the outline, touch nothing else.
+const plus = defineShape('plus', {
+  trace(path, x, y, r) {
+    const t = r * 0.3;
+    path.moveTo(x - t, y - r); path.lineTo(x + t, y - r); path.lineTo(x + t, y - t);
+    path.lineTo(x + r, y - t); path.lineTo(x + r, y + t); path.lineTo(x + t, y + t);
+    path.lineTo(x + t, y + r); path.lineTo(x - t, y + r); path.lineTo(x - t, y + t);
+    path.lineTo(x - r, y + t); path.lineTo(x - r, y - t); path.lineTo(x - t, y - t);
+    path.closePath();
+  },
+});
+
+// draw: paint the particle yourself. fillStyle, strokeStyle and lineWidth
+// arrive set to the particle's colour variant. One fill per particle rather
+// than per run — the escape hatch for sprites, text, gradients, or a glyph
+// that needs more than one colour.
+const rocket = defineShape('rocket', {
+  draw(ctx, x, y, r) {
+    ctx.font = `${r * 2}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🚀', x, y);
+  },
+});
+
+createBackground(canvas, { shape: plus });
+```
+
+`path` is a `CanvasPath` — the interface `CanvasRenderingContext2D` and
+`Path2D` share — so a `trace` written against one works against the other.
+`(x, y)` is the centre and `r` the **circumradius**: the glyph must fit inside
+the circle of radius `r`. Contacts and wall bounces resolve against that circle,
+which is why a square looks a touch smaller than a circle of the same `size`
+(its corners reach `r`; its edges do not) and why a star's points touch a
+neighbour slightly before its body does. Honest polygon contact would mean a
+physics engine, not a background.
+
+Both functions also receive the particle's index and the `ParticleStore`, so a
+shape can orient itself along `vx`/`vy` or hash the index into a stable
+rotation. When a shape offers both, `trace` is used.
+
+## Custom layers
+
+The field is one `ILayer`; the engine runs a stack of them. Anything that is
+not "N things at N positions" — a sine wave, a gradient wash, a constellation
+that reacts to the pointer — is a layer, and gets the engine for free: the
+DPR-capped surface, the clamped clock, pause/resume, tab-visibility
+throttling, resize, a seeded RNG, the palette, and the background paint.
+
+```ts
+import { createBackground, defineLayer } from 'bg-9000';
+
+const waves = defineLayer('waves', {
+  placement: 'below',                  // under the circles; 'above' is the default
+  render(ctx, scene) {                 // a CanvasRenderingContext2D, in CSS pixels
+    ctx.strokeStyle = scene.theme.variants[0].stroke ?? '#fff';
+    ctx.beginPath();
+    for (let x = 0; x <= scene.width; x += 4) {
+      ctx.lineTo(x, scene.height / 2 + Math.sin(x / 60 + scene.time) * 20);
+    }
+    ctx.stroke();
+  },
+});
+
+const bg = createBackground(canvas, { layers: [waves] });
+
+bg.addLayer(other);                    // sugar for update({ layers: [...config.layers, other] })
+bg.removeLayer(waves);                 // disposes it
+bg.update({ particles: false });       // your layers alone, on the engine
+```
+
+Every hook on `defineLayer` is optional: `init`, `update` (advance by
+`scene.dt`, no drawing), `render` (draw, no mutation), `resize`, `dispose`.
+Context state is saved and restored around `render`, so a layer cannot leak a
+`fillStyle` into the field's draw calls and does not have to tidy up.
+
+`scene` is everything a layer is allowed to know about the frame:
+
+| | |
+|---|---|
+| `width`, `height`, `dpr` | CSS pixels; the DPR transform is already applied |
+| `time`, `dt`, `frame` | seconds since start (excluding pauses), seconds since last frame (clamped), frame count |
+| `theme` | the resolved palette — `background`, and `variants[]` of `{ fill, stroke, lineWidth }` |
+| `config` | the normalised config, so a layer can honour the shared vocabulary: `amount` as "how many of my thing", `speed` as a multiplier |
+| `pointer` | `{ x, y, down, active }` in canvas CSS pixels — see below |
+| `rng` | seeded; the same seed gives the same layout |
+
+`config.layers` is the single record of what is in the stack. The engine diffs
+it by identity on every `update`: a layer that appears is initialised, one that
+disappears is disposed, one that stays is left alone. Sending the same instance
+every call costs nothing. A layer that leaves and comes back is initialised
+again, so `init` must be safe to call after `dispose`.
+
+The `amount`, `size`, `speed`, `style`, `palette`, `shape` and `collisions`
+options describe the built-in field and nothing else. A custom layer is free to
+read them from `scene.config` — the playground's waves layer turns `amount`
+into a wave count — but the engine never interprets them on its behalf.
+
+### A second field
+
+The built-in field is exported as a factory, so "small stars over large
+circles, each with its own theme and its own contact stage" is composition:
+
+```ts
+import { createBackground, createParticleField, resolveTheme } from 'bg-9000';
+
+createBackground(canvas, {
+  size: 'large', style: 'see-through',
+  layers: [
+    createParticleField({
+      amount: 'alot', size: 'small', speed: 1.5, drag: 0, maxCount: 600,
+      restitution: 1, collisions: false, shape: 'star',
+      theme: resolveTheme('dusk', 'dot'),
+    }),
+  ],
+});
+```
+
+### The full `ILayer`
+
+`defineLayer` is sugar. A class implementing `ILayer` directly gets the
+`IRenderer` rather than the context, and uses `renderer.drawImmediate(fn)` for
+direct drawing — an optional member, so a backend that cannot offer a 2D
+context simply omits it and the layer draws nothing there.
+
+### Pointer
+
+The canvas has `pointer-events: none` so that it never steals a click from the
+page, which means it never receives a pointer event either. The engine listens
+on `window` instead — passive listeners, nothing prevented or stopped — maps
+the position into the canvas's box in CSS pixels, and publishes it as
+`scene.pointer` before every `update`. `active` is "inside the canvas box";
+`down` is a held button or touch.
+
+```ts
+update(scene) {
+  if (scene.pointer.active) this.target = scene.pointer.x;
+}
+```
+
+`pointer: false` attaches no listeners at all, and the state reads as a
+stationary, inactive cursor at the origin. The built-in field does not read the
+pointer; a pointer force is a four-line `IForce` and is left to the caller.
+
 ## Collisions
 
 Testing every pair is 106,000 checks per frame at `alot`. Circles are bucketed
@@ -160,6 +331,31 @@ to circle contacts as well as walls.
 `collisions: false` removes the stage from the pipeline rather than branching
 inside it, so the grid is never built and the cost really is zero.
 
+### Collisions and custom graphics
+
+Collisions belong to a layer's data model, not to the canvas. There is no
+global physics world, and two layers never collide with one another: the first
+sentence of `ILayer`'s contract is that layers share no data model. Three
+cases follow from that.
+
+- **A custom shape in the built-in field** collides exactly as circles do,
+  against its circumradius. Want circles and squares knocking about together?
+  That is one field, because one field is one store — give it a shape whose
+  `trace` branches on the particle index.
+- **A custom layer that wants its own physics** assembles the same parts the
+  field does, over its own store. `ParticleStore`, `CircleCollisions`,
+  `BoundaryBounce`, `Drag` and `spawnField` are all exported:
+
+  ```ts
+  const store = new ParticleStore(200);
+  const contacts = new CircleCollisions(200, 0.9);
+  const walls = new BoundaryBounce(1);
+  // in update(scene): forces → integrate → contacts.resolve(store, scene) → walls.resolve(store, scene)
+  ```
+
+  Or skip the assembly and take a whole field: `createParticleField`.
+- **Cross-layer collisions** — waves deflecting circles — are a non-goal.
+
 ## Architecture
 
 ```
@@ -168,19 +364,32 @@ forces → integrate → constraints → render
 
 - **`ILayer`** is the extension seam. The unit of extension is the *effect*, not
   the particle — a field of circles and a set of sinusoidal lines share the
-  engine but no data model.
+  engine but no data model. The engine runs a stack: your `'below'` layers,
+  the built-in field, your `'above'` layers. `defineLayer` wraps a plain
+  object into one; `createParticleField` hands you the built-in as one.
+- **`IShape`** is the one place geometry lives. `trace` adds an outline to a
+  batched path; `draw` paints a particle itself. The store, spawn, forces and
+  collisions never know which glyph is in use.
 - **`IForce`** contributes acceleration and composes by summation.
   **`IConstraint`** corrects position after integration. Walls and contacts are
   constraints; springy walls let fast particles escape the viewport. Contacts
   resolve before walls, so the boundary always has the last word on position.
 - **`ParticleStore`** is structure-of-arrays over typed arrays. Nothing
   allocates per frame, and the buffers are transferable to a worker later.
-- **`IRenderer`** is batch-shaped (`drawCircleGroups`, never `drawCircle`). A
-  per-primitive interface cannot be implemented efficiently on WebGL.
+- **`IRenderer`** is batch-shaped (`drawShapeGroups`, never `drawShape`). A
+  per-primitive interface cannot be implemented efficiently on WebGL. A
+  tracing shape keeps that batch — one path per colour run — and a drawing
+  shape is the stated exception; a renderer that cannot draw a shape throws.
+  The one optional member, `drawImmediate`, hands custom layers the 2D context
+  with state saved and restored around them. `drawCircleGroups` remains as a
+  deprecated alias for `drawShapeGroups(…, SHAPES.circle)` until 0.2.
+- **`ISceneContext`** is built once by the engine and mutated in place. Test
+  fixtures should use `createSceneContext()` rather than a literal, so that a
+  new field on it is never a change they have to make.
 
 Particles are laid out sorted by colour at spawn and never reordered, so each
 colour is a contiguous index range. Rendering draws one path containing many
-sub-arcs per colour: three fill calls for 460 circles rather than 460.
+sub-paths per colour: three fill calls for 460 particles rather than 460.
 
 Every interface lives under `src/model`, in a tree mirroring the code that
 implements it — `IRenderer` at `model/render/renderer.interface.ts`, its

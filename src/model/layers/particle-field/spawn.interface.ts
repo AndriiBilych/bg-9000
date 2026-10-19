@@ -1,5 +1,5 @@
-import type { Amount, Size } from '../../../util/scalars.js';
-import type { IRng } from '../../util/rng.interface.js';
+import type { Amount, Size } from '../../../util/scalars';
+import type { IRng } from '../../util/rng.interface';
 
 export interface ISpawnOptions {
   amount: Amount;

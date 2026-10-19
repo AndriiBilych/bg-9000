@@ -46,6 +46,11 @@
         <select id="palette"></select>
       </div>
 
+      <div class="row">
+        <label for="shape">Shape</label>
+        <select id="shape"></select>
+      </div>
+
       <div class="custom" id="custom" hidden>
         <div>
           <label for="customBackground">Back</label>
@@ -83,6 +88,21 @@
         <label for="collisions">Collisions</label>
       </div>
 
+      <div class="row check">
+        <input id="particles" type="checkbox" checked />
+        <label for="particles">Particles</label>
+      </div>
+
+      <div class="row check">
+        <input id="waves" type="checkbox" />
+        <label for="waves">Waves layer</label>
+      </div>
+
+      <div class="row check">
+        <input id="pointer" type="checkbox" checked />
+        <label for="pointer">Pointer</label>
+      </div>
+
       <div class="row buttons">
         <button id="reseed" type="button">Reseed</button>
         <button id="toggle" type="button">Pause</button>
@@ -97,6 +117,8 @@
 
       <p class="note">
         Contacts is overlapping pairs resolved on the last step.
+        <em>plus</em> and <em>smiley</em> are custom shapes; the waves layer is a
+        custom layer that follows amount, speed, palette and the pointer.
         <a href="./gallery.html">All 15 combinations →</a>
       </p>
     </aside>

@@ -1,9 +1,9 @@
 import type {
   ISpawnOptions,
   ISpawnResult,
-} from '../../model/layers/particle-field/spawn.interface.js';
-import { SIZE_RADIUS, resolveCount } from '../../util/scalars.js';
-import type { ParticleStore } from './store.js';
+} from '../../model/layers/particle-field/spawn.interface';
+import { SIZE_RADIUS, resolveCount } from '../../util/scalars';
+import type { ParticleStore } from './store';
 
 /** Base drift range in CSS pixels per second, before the speed multiplier. */
 const DRIFT_MIN = 10;

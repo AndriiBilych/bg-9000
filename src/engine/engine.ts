@@ -1,17 +1,33 @@
-import { DEFAULT_CONFIG, normaliseConfig } from '../config/config.js';
-import { ParticleField } from '../layers/particle-field/particle-field.js';
-import type { IBackgroundConfig } from '../model/config/config.interface.js';
-import type { IBackground, IBackgroundStats } from '../model/engine/engine.interface.js';
-import type { ISceneContext } from '../model/engine/scene-context.interface.js';
-import type { ILayer } from '../model/layers/layer.interface.js';
-import type { IRenderer } from '../model/render/renderer.interface.js';
-import type { ITheme } from '../model/theme/theme.interface.js';
-import { Canvas2DRenderer } from '../render/canvas2d.js';
-import { resolveTheme } from '../theme/theme.js';
-import { createRng } from '../util/rng.js';
-import { Clock } from './clock.js';
-import { createPointerState } from './scene-context.js';
-import { Surface } from './surface.js';
+import { DEFAULT_CONFIG, normaliseConfig } from '../config/config';
+import { ParticleField } from '../layers/particle-field/particle-field';
+import type { IBackgroundConfig } from '../model/config/config.interface';
+import type { IBackground, IBackgroundStats } from '../model/engine/engine.interface';
+import type { ISceneContext } from '../model/engine/scene-context.interface';
+import type { ILayer } from '../model/layers/layer.interface';
+import type { IParticleFieldOptions } from '../model/layers/particle-field/particle-field.interface';
+import type { IRenderer } from '../model/render/renderer.interface';
+import type { ITheme } from '../model/theme/theme.interface';
+import { Canvas2DRenderer } from '../render/canvas2d';
+import { resolveTheme } from '../theme/theme';
+import { createRng } from '../util/rng';
+import { Clock } from './clock';
+import { PointerTracker } from './pointer';
+import { createPointerState } from './scene-context';
+import { Surface } from './surface';
+
+function fieldOptions(config: IBackgroundConfig, theme: ITheme): IParticleFieldOptions {
+  return {
+    amount: config.amount,
+    size: config.size,
+    speed: config.speed,
+    drag: config.drag,
+    maxCount: config.maxCount,
+    restitution: config.restitution,
+    collisions: config.collisions,
+    shape: config.shape,
+    theme,
+  };
+}
 
 export function createBackground(
   canvas: HTMLCanvasElement,
@@ -36,6 +52,8 @@ export function createBackground(
     frame: 0,
     pointer,
     rng: createRng(config.seed),
+    theme,
+    config,
   };
 
   // Declared ahead of `new Surface(...)`: the Surface constructor measures
@@ -47,14 +65,15 @@ export function createBackground(
   let raf = 0;
   let fps = 0;
 
-  const layers: ILayer[] = [];
+  /** The stack in draw order. Only layers in it receive update/render/resize. */
+  let stack: ILayer[] = [];
 
   const surface = new Surface(canvas, config.maxDpr, (width, height, dpr, prevWidth, prevHeight) => {
     ctx.width = width;
     ctx.height = height;
     ctx.dpr = dpr;
     if (!initialised) return;
-    for (const layer of layers) layer.resize(ctx, prevWidth, prevHeight);
+    for (const layer of stack) layer.resize(ctx, prevWidth, prevHeight);
     if (!running) renderFrame();
   });
 
@@ -63,28 +82,43 @@ export function createBackground(
   ctx.dpr = surface.dpr;
 
   const renderer: IRenderer = new Canvas2DRenderer(surface);
+  const tracker = new PointerTracker(canvas, pointer);
 
-  const field = new ParticleField({
-    amount: config.amount,
-    size: config.size,
-    speed: config.speed,
-    drag: config.drag,
-    maxCount: config.maxCount,
-    restitution: config.restitution,
-    collisions: config.collisions,
-    theme,
-  });
-  layers.push(field);
+  const field = new ParticleField(fieldOptions(config, theme));
 
-  for (const layer of layers) layer.init(ctx);
+  // --- layer stack ----------------------------------------------------------
+
+  function desiredStack(): ILayer[] {
+    const next: ILayer[] = [];
+    for (const layer of config.layers) if (layer.placement === 'below') next.push(layer);
+    if (config.particles) next.push(field);
+    for (const layer of config.layers) if (layer.placement !== 'below') next.push(layer);
+    return next;
+  }
+
+  /**
+   * Diffed by identity: new layers are initialised, departed ones disposed,
+   * moved ones left alone. The built-in field is just another entry, which is
+   * what makes `particles: false` remove it rather than branch around it.
+   */
+  function syncStack(): void {
+    const next = desiredStack();
+    for (const layer of next) if (!stack.includes(layer)) layer.init(ctx);
+    for (const layer of stack) if (!next.includes(layer)) layer.dispose();
+    stack = next;
+  }
+
+  syncStack();
   initialised = true;
+
+  if (config.pointer) tracker.attach();
 
   // --- frame loop ---------------------------------------------------------
 
   function renderFrame(): void {
     if (disposed) return;
     renderer.beginFrame(theme.background);
-    for (const layer of layers) layer.render(renderer, ctx);
+    for (const layer of stack) layer.render(renderer, ctx);
     renderer.endFrame();
   }
 
@@ -101,7 +135,7 @@ export function createBackground(
       fps += (1 / clock.dt - fps) * 0.1;
     }
 
-    for (const layer of layers) layer.update(ctx);
+    for (const layer of stack) layer.update(ctx);
     renderFrame();
   };
 
@@ -132,6 +166,37 @@ export function createBackground(
 
   // --- public surface -----------------------------------------------------
 
+  function update(next: Partial<IBackgroundConfig>): void {
+    if (disposed) return;
+    const previous = config;
+    config = normaliseConfig(next, config);
+    ctx.config = config;
+
+    if (config.seed !== previous.seed) {
+      ctx.rng = createRng(config.seed);
+    }
+
+    if (config.palette !== previous.palette || config.style !== previous.style) {
+      theme = resolveTheme(config.palette, config.style);
+      ctx.theme = theme;
+    }
+
+    // Configured even while out of the stack, so switching it back on finds
+    // it up to date.
+    field.configure(fieldOptions(config, theme), ctx);
+
+    if (config.layers !== previous.layers || config.particles !== previous.particles) {
+      syncStack();
+    }
+
+    if (config.pointer !== previous.pointer) {
+      if (config.pointer) tracker.attach();
+      else tracker.detach();
+    }
+
+    if (!running) renderFrame();
+  }
+
   return {
     get config(): Readonly<IBackgroundConfig> {
       return config;
@@ -141,41 +206,30 @@ export function createBackground(
       return theme;
     },
 
-    update(next: Partial<IBackgroundConfig>): void {
-      if (disposed) return;
-      const previous = config;
-      config = normaliseConfig(next, config);
+    update,
 
-      if (config.seed !== previous.seed) {
-        ctx.rng = createRng(config.seed);
-      }
+    addLayer(layer: ILayer): void {
+      if (disposed || config.layers.includes(layer)) return;
+      update({ layers: [...config.layers, layer] });
+    },
 
-      if (config.palette !== previous.palette || config.style !== previous.style) {
-        theme = resolveTheme(config.palette, config.style);
-      }
-
-      field.configure(
-        {
-          amount: config.amount,
-          size: config.size,
-          speed: config.speed,
-          drag: config.drag,
-          maxCount: config.maxCount,
-          restitution: config.restitution,
-          collisions: config.collisions,
-          theme,
-        },
-        ctx,
-      );
-
-      if (!running) renderFrame();
+    removeLayer(layer: ILayer): void {
+      if (disposed || !config.layers.includes(layer)) return;
+      update({ layers: config.layers.filter((l) => l !== layer) });
     },
 
     pause: stop,
     resume: start,
 
     getStats(): IBackgroundStats {
-      return { fps, count: field.count, contacts: field.contactCount, dt: ctx.dt, running };
+      const active = config.particles;
+      return {
+        fps,
+        count: active ? field.count : 0,
+        contacts: active ? field.contactCount : 0,
+        dt: ctx.dt,
+        running,
+      };
     },
 
     dispose(): void {
@@ -183,7 +237,9 @@ export function createBackground(
       disposed = true;
       stop();
       document.removeEventListener('visibilitychange', onVisibility);
-      for (const layer of layers) layer.dispose();
+      tracker.detach();
+      for (const layer of stack) layer.dispose();
+      stack = [];
       renderer.dispose();
       surface.dispose();
     },

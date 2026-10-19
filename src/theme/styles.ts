@@ -5,7 +5,7 @@
  * palettes is fifteen looks from eight declarations, and neither has to know
  * anything about the other beyond "fill, outline, or both".
  */
-import type { IStyleSpec } from '../model/theme/styles.interface.js';
+import type { IStyleSpec } from '../model/theme/styles.interface';
 
 export type CircleStyle = 'see-through' | 'dot' | 'full';
 

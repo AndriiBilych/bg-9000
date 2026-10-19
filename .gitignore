@@ -12,3 +12,6 @@ yalc.lock
 .vscode/
 .DS_Store
 Thumbs.db
+
+# claude code
+.claude/settings.local.json

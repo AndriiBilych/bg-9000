@@ -1,4 +1,4 @@
-import type { PaletteId } from '../../theme/palettes.js';
+import type { PaletteId } from '../../theme/palettes';
 
 /**
  * A colour scheme.

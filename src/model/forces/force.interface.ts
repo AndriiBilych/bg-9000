@@ -1,5 +1,5 @@
-import type { ParticleStore } from '../../layers/particle-field/store.js';
-import type { ISceneContext } from '../engine/scene-context.interface.js';
+import type { ParticleStore } from '../../layers/particle-field/store';
+import type { ISceneContext } from '../engine/scene-context.interface';
 
 /**
  * The simulation runs in two phases, and it is worth being explicit about why.

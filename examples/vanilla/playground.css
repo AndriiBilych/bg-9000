@@ -46,6 +46,13 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  /* Never taller than the viewport: the panel scrolls, the page does not. */
+  max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--edge) transparent;
 }
 
 h1 {

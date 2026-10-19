@@ -1,6 +1,6 @@
-import type { ISceneContext } from '../../model/engine/scene-context.interface.js';
-import type { IConstraint } from '../../model/forces/force.interface.js';
-import type { ParticleStore } from './store.js';
+import type { ISceneContext } from '../../model/engine/scene-context.interface';
+import type { IConstraint } from '../../model/forces/force.interface';
+import type { ParticleStore } from './store';
 
 /**
  * Overlap left uncorrected, in CSS pixels.

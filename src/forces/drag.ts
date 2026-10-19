@@ -1,6 +1,6 @@
-import type { ISceneContext } from '../model/engine/scene-context.interface.js';
-import type { IForce } from '../model/forces/force.interface.js';
-import type { ParticleStore } from '../layers/particle-field/store.js';
+import type { ISceneContext } from '../model/engine/scene-context.interface';
+import type { IForce } from '../model/forces/force.interface';
+import type { ParticleStore } from '../layers/particle-field/store';
 
 /**
  * Velocity-proportional damping, F = -k·m·v.

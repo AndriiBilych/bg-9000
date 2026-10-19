@@ -1,24 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { createPointerState } from '../../engine/scene-context.js';
-import type { ISceneContext } from '../../model/engine/scene-context.interface.js';
-import type { IParticleFieldOptions } from '../../model/layers/particle-field/particle-field.interface.js';
-import type { IDrawGroup, IRenderer } from '../../model/render/renderer.interface.js';
-import { resolveTheme } from '../../theme/theme.js';
-import { createRng } from '../../util/rng.js';
-import { ParticleField } from './particle-field.js';
-import type { ParticleStore } from './store.js';
+import { createSceneContext } from '../../engine/scene-context';
+import type { ISceneContext } from '../../model/engine/scene-context.interface';
+import type { IParticleFieldOptions } from '../../model/layers/particle-field/particle-field.interface';
+import type { IDrawGroup, IRenderer } from '../../model/render/renderer.interface';
+import type { IShape } from '../../model/shapes/shape.interface';
+import { defineShape } from '../../shapes/shapes';
+import { resolveTheme } from '../../theme/theme';
+import { createRng } from '../../util/rng';
+import { ParticleField } from './particle-field';
+import type { ParticleStore } from './store';
 
 function scene(): ISceneContext {
-  return {
-    width: 1280,
-    height: 720,
-    dpr: 1,
-    time: 0,
-    dt: 0,
-    frame: 0,
-    pointer: createPointerState(),
-    rng: createRng(42),
-  };
+  return createSceneContext({ width: 1280, height: 720, rng: createRng(42) });
 }
 
 function options(patch: Partial<IParticleFieldOptions> = {}): IParticleFieldOptions {
@@ -39,14 +32,17 @@ function options(patch: Partial<IParticleFieldOptions> = {}): IParticleFieldOpti
 class RecordingRenderer implements IRenderer {
   readonly kind = 'recording';
   groups: IDrawGroup[] = [];
+  shape: string | null = null;
   background: string | null = null;
 
   beginFrame(background: string | null): void {
     this.background = background;
   }
-  drawCircleGroups(_store: ParticleStore, groups: readonly IDrawGroup[]): void {
+  drawShapeGroups(_store: ParticleStore, groups: readonly IDrawGroup[], shape: IShape): void {
     this.groups = groups.map((g) => ({ ...g }));
+    this.shape = shape.name;
   }
+  drawCircleGroups(): void {}
   endFrame(): void {}
   dispose(): void {}
 }
@@ -62,7 +58,7 @@ function positions(field: ParticleField, ctx: ISceneContext): number[] {
   // path the real engine has, so this tests what actually ships.
   const renderer = new RecordingRenderer();
   const captured: number[] = [];
-  renderer.drawCircleGroups = (store, groups) => {
+  renderer.drawShapeGroups = (store, groups) => {
     for (const group of groups) {
       for (let i = group.start; i < group.end; i++) captured.push(store.x[i], store.y[i]);
     }
@@ -191,5 +187,46 @@ describe('ParticleField colouring', () => {
 
     field.configure(options({ amount: 'alot' }), ctx);
     expect(field.count).toBeGreaterThan(before);
+  });
+});
+
+describe('ParticleField shapes', () => {
+  function shapeDrawn(field: ParticleField, ctx: ISceneContext): string | null {
+    const renderer = new RecordingRenderer();
+    field.render(renderer, ctx);
+    return renderer.shape;
+  }
+
+  it('draws circles when no shape is given', () => {
+    const ctx = scene();
+    const field = new ParticleField(options());
+    field.init(ctx);
+    expect(shapeDrawn(field, ctx)).toBe('circle');
+  });
+
+  it('resolves a built-in name and passes a custom shape through', () => {
+    const ctx = scene();
+    const named = new ParticleField(options({ shape: 'star' }));
+    named.init(ctx);
+    expect(shapeDrawn(named, ctx)).toBe('star');
+
+    const custom = defineShape('plus', { trace: (p, x, y) => p.moveTo(x, y) });
+    const own = new ParticleField(options({ shape: custom }));
+    own.init(ctx);
+    expect(shapeDrawn(own, ctx)).toBe('plus');
+  });
+
+  it('changes shape without moving a single particle or touching the groups', () => {
+    const ctx = scene();
+    const field = new ParticleField(options());
+    field.init(ctx);
+    const before = positions(field, ctx);
+    const groups = draw(field, ctx);
+
+    field.configure(options({ shape: 'heart' }), ctx);
+
+    expect(shapeDrawn(field, ctx)).toBe('heart');
+    expect(positions(field, ctx)).toEqual(before);
+    expect(draw(field, ctx)).toEqual(groups);
   });
 });

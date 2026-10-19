@@ -1,4 +1,4 @@
-import type { IRng } from '../model/util/rng.interface.js';
+import type { IRng } from '../model/util/rng.interface';
 
 /**
  * Seeded pseudo-random source (mulberry32).

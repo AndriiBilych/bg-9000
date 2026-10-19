@@ -1,5 +1,5 @@
-import type { PaletteId } from '../../theme/palettes.js';
-import type { CircleStyle } from '../../theme/styles.js';
+import type { PaletteId } from '../../theme/palettes';
+import type { CircleStyle } from '../../theme/styles';
 
 /**
  * One resolved appearance: everything the renderer needs for a run of circles,

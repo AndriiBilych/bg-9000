@@ -1,21 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { createRng } from '../util/rng.js';
-import { createPointerState } from '../engine/scene-context.js';
-import { ParticleStore } from '../layers/particle-field/store.js';
-import type { ISceneContext } from '../model/engine/scene-context.interface.js';
-import { BoundaryBounce } from './boundary-bounce.js';
+import { createRng } from '../util/rng';
+import { createSceneContext } from '../engine/scene-context';
+import { ParticleStore } from '../layers/particle-field/store';
+import type { ISceneContext } from '../model/engine/scene-context.interface';
+import { BoundaryBounce } from './boundary-bounce';
 
 function scene(width: number, height: number): ISceneContext {
-  return {
-    width,
-    height,
-    dpr: 1,
-    time: 0,
-    dt: 1 / 60,
-    frame: 0,
-    pointer: createPointerState(),
-    rng: createRng(1),
-  };
+  return createSceneContext({ width, height, dt: 1 / 60, rng: createRng(1) });
 }
 
 describe('BoundaryBounce', () => {

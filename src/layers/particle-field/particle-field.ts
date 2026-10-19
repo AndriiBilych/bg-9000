@@ -1,13 +1,15 @@
-import { BoundaryBounce } from '../../forces/boundary-bounce.js';
-import { Drag } from '../../forces/drag.js';
-import type { ISceneContext } from '../../model/engine/scene-context.interface.js';
-import type { IConstraint, IForce } from '../../model/forces/force.interface.js';
-import type { ILayer } from '../../model/layers/layer.interface.js';
-import type { IParticleFieldOptions } from '../../model/layers/particle-field/particle-field.interface.js';
-import type { IDrawGroup, IRenderer } from '../../model/render/renderer.interface.js';
-import { CircleCollisions } from './collision.js';
-import { spawnField } from './spawn.js';
-import { ParticleStore } from './store.js';
+import { BoundaryBounce } from '../../forces/boundary-bounce';
+import { Drag } from '../../forces/drag';
+import type { ISceneContext } from '../../model/engine/scene-context.interface';
+import type { IConstraint, IForce } from '../../model/forces/force.interface';
+import type { ILayer } from '../../model/layers/layer.interface';
+import type { IParticleFieldOptions } from '../../model/layers/particle-field/particle-field.interface';
+import type { IDrawGroup, IRenderer } from '../../model/render/renderer.interface';
+import type { IShape } from '../../model/shapes/shape.interface';
+import { resolveShape } from '../../shapes/shapes';
+import { CircleCollisions } from './collision';
+import { spawnField } from './spawn';
+import { ParticleStore } from './store';
 
 /**
  * A field of drifting circles.
@@ -30,6 +32,7 @@ export class ParticleField implements ILayer {
   private readonly contacts: CircleCollisions;
 
   private groups: IDrawGroup[] = [];
+  private shape: IShape;
   /** Kept so a palette or style change can repaint without respawning. */
   private colourBounds: Int32Array = new Int32Array(2);
   private builtForArea = 0;
@@ -39,6 +42,7 @@ export class ParticleField implements ILayer {
     this.contacts = new CircleCollisions(options.maxCount, options.restitution);
     this.drag.coefficient = options.drag;
     this.boundary.restitution = options.restitution;
+    this.shape = resolveShape(options.shape);
 
     this.forces.push(this.drag);
     this.syncConstraints();
@@ -71,6 +75,7 @@ export class ParticleField implements ILayer {
     this.boundary.restitution = options.restitution;
     this.contacts.restitution = options.restitution;
     if (options.collisions !== previous.collisions) this.syncConstraints();
+    this.shape = resolveShape(options.shape);
 
     // Colour count is a property of the palette, not the style, so switching
     // style never lands here — and switching between the stock palettes does
@@ -118,7 +123,7 @@ export class ParticleField implements ILayer {
   }
 
   render(renderer: IRenderer, _ctx: ISceneContext): void {
-    renderer.drawCircleGroups(this.store, this.groups);
+    renderer.drawShapeGroups(this.store, this.groups, this.shape);
   }
 
   resize(ctx: ISceneContext, prevWidth: number, prevHeight: number): void {
@@ -198,4 +203,12 @@ export class ParticleField implements ILayer {
   get contactCount(): number {
     return this.options.collisions ? this.contacts.contacts : 0;
   }
+}
+
+/**
+ * A particle field as a custom layer, for stacking a second field over
+ * the built-in one. A field only ever collides with itself.
+ */
+export function createParticleField(options: IParticleFieldOptions): ParticleField {
+  return new ParticleField({ ...options });
 }

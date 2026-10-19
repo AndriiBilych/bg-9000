@@ -1,12 +1,12 @@
-import type { ICustomPalette, IPalette } from '../model/theme/palettes.interface.js';
-import type { IColourVariant, ITheme } from '../model/theme/theme.interface.js';
+import type { ICustomPalette, IPalette } from '../model/theme/palettes.interface';
+import type { IColourVariant, ITheme } from '../model/theme/theme.interface';
 import {
   PALETTES,
   expandCustomPalette,
   isCustomPalette,
   type PaletteName,
-} from './palettes.js';
-import { STYLES, type CircleStyle } from './styles.js';
+} from './palettes';
+import { STYLES, type CircleStyle } from './styles';
 
 /**
  * How many colour variants a palette offers, independent of style.

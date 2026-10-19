@@ -1,6 +1,6 @@
-import type { ISceneContext } from '../model/engine/scene-context.interface.js';
-import type { IConstraint } from '../model/forces/force.interface.js';
-import type { ParticleStore } from '../layers/particle-field/store.js';
+import type { ISceneContext } from '../model/engine/scene-context.interface';
+import type { IConstraint } from '../model/forces/force.interface';
+import type { ParticleStore } from '../layers/particle-field/store';
 
 /**
  * Keeps every circle fully inside the viewport.

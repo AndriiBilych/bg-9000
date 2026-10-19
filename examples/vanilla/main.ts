@@ -2,20 +2,29 @@ import {
   PALETTE_NAMES,
   PRESETS,
   PRESET_NAMES,
+  SHAPE_NAMES,
   STYLE_NAMES,
   createBackground,
   isCustomPalette,
+  isShapeName,
   type Amount,
   type CircleStyle,
   type IBackgroundConfig,
   type ICustomPalette,
+  type IShape,
   type PaletteName,
   type PresetName,
+  type ShapeName,
   type Size,
 } from 'bg-9000';
+import { CUSTOM_SHAPES } from './shapes';
+import { waves } from './waves';
 
-/** The palette select carries the stock names plus one entry for your own. */
+/** The palette select carries the stock names plus one entry for a custom palette. */
 const CUSTOM = 'custom';
+
+/** The shape select carries the built-ins plus the two defined in shapes.ts. */
+const CUSTOM_SHAPE_NAMES = Object.keys(CUSTOM_SHAPES) as Array<keyof typeof CUSTOM_SHAPES>;
 
 function el<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -37,6 +46,7 @@ const amount = el<HTMLSelectElement>('amount');
 const size = el<HTMLSelectElement>('size');
 const style = el<HTMLSelectElement>('style');
 const palette = el<HTMLSelectElement>('palette');
+const shape = el<HTMLSelectElement>('shape');
 const custom = el('custom');
 const customBackground = el<HTMLInputElement>('customBackground');
 const customFill = el<HTMLInputElement>('customFill');
@@ -45,6 +55,9 @@ const speed = el<HTMLInputElement>('speed');
 const drag = el<HTMLInputElement>('drag');
 const restitution = el<HTMLInputElement>('restitution');
 const collisions = el<HTMLInputElement>('collisions');
+const particles = el<HTMLInputElement>('particles');
+const wavesOn = el<HTMLInputElement>('waves');
+const pointerOn = el<HTMLInputElement>('pointer');
 
 const speedOut = el<HTMLOutputElement>('speedOut');
 const dragOut = el<HTMLOutputElement>('dragOut');
@@ -70,6 +83,7 @@ const bg = createBackground(canvas, {
 options(preset, ['—', ...PRESET_NAMES], '—');
 options(style, STYLE_NAMES, bg.config.style);
 options(palette, [...PALETTE_NAMES, CUSTOM], 'mint');
+options(shape, [...SHAPE_NAMES, ...CUSTOM_SHAPE_NAMES], bg.config.shape as string);
 
 /**
  * The palette to send: a stock name, or the three pickers read as a set.
@@ -85,6 +99,12 @@ function readPalette(): PaletteName | ICustomPalette {
     fill: customFill.value,
     outline: customOutline.value,
   };
+}
+
+/** The shape to send: a built-in name, or one of the two custom objects. */
+function readShape(): ShapeName | IShape {
+  if (isShapeName(shape.value)) return shape.value;
+  return CUSTOM_SHAPES[shape.value as keyof typeof CUSTOM_SHAPES];
 }
 
 function paintSwatches(): void {
@@ -121,10 +141,17 @@ function push(): void {
     size: size.value as Size,
     style: style.value as CircleStyle,
     palette: readPalette(),
+    shape: readShape(),
     speed: Number(speed.value),
     drag: Number(drag.value),
     restitution: Number(restitution.value),
     collisions: collisions.checked,
+    particles: particles.checked,
+    pointer: pointerOn.checked,
+    // The layer list is diffed by identity, so sending the same `waves`
+    // instance every time costs nothing; it is initialised once when it first
+    // appears and disposed when it drops out.
+    layers: wavesOn.checked ? [waves] : [],
   });
 
   paintSwatches();
@@ -143,10 +170,14 @@ function sync(config: Readonly<IBackgroundConfig>): void {
   } else {
     palette.value = config.palette;
   }
+  shape.value = typeof config.shape === 'string' ? config.shape : config.shape.name;
   speed.value = String(config.speed);
   drag.value = String(config.drag);
   restitution.value = String(config.restitution);
   collisions.checked = config.collisions;
+  particles.checked = config.particles;
+  pointerOn.checked = config.pointer;
+  wavesOn.checked = config.layers.includes(waves);
 }
 
 for (const control of [
@@ -157,10 +188,14 @@ for (const control of [
   customBackground,
   customFill,
   customOutline,
+  shape,
   speed,
   drag,
   restitution,
   collisions,
+  particles,
+  wavesOn,
+  pointerOn,
 ]) {
   control.addEventListener('input', () => {
     preset.value = '—';
@@ -193,8 +228,8 @@ toggle.addEventListener('click', () => {
 setInterval(() => {
   const stats = bg.getStats();
   fpsOut.textContent = stats.running ? stats.fps.toFixed(0) : '–';
-  countOut.textContent = String(stats.count);
-  contactsOut.textContent = bg.config.collisions ? String(stats.contacts) : 'off';
+  countOut.textContent = bg.config.particles ? String(stats.count) : 'off';
+  contactsOut.textContent = bg.config.collisions && bg.config.particles ? String(stats.contacts) : 'off';
   dprOut.textContent = String(Math.min(window.devicePixelRatio || 1, bg.config.maxDpr));
 }, 250);
 

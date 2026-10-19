@@ -1,8 +1,8 @@
-import type { Surface } from '../engine/surface.js';
-import type { ParticleStore } from '../layers/particle-field/store.js';
-import type { IDrawGroup, IRenderer } from '../model/render/renderer.interface.js';
-
-const TAU = Math.PI * 2;
+import type { Surface } from '../engine/surface';
+import type { ParticleStore } from '../layers/particle-field/store';
+import type { IDrawGroup, IRenderer } from '../model/render/renderer.interface';
+import type { IShape } from '../model/shapes/shape.interface';
+import { SHAPES } from '../shapes/shapes';
 
 export class Canvas2DRenderer implements IRenderer {
   readonly kind = 'canvas2d';
@@ -20,11 +20,17 @@ export class Canvas2DRenderer implements IRenderer {
   }
 
   /**
-   * Each group becomes a single path holding many sub-arcs, so a field of 460
-   * circles costs three fill calls rather than 460. `moveTo` before each `arc`
-   * is what keeps the sub-paths from being joined by a connecting line.
+   * A tracing shape becomes one path per group holding many sub-paths, so a
+   * field of 460 particles costs three fill calls rather than 460. A drawing
+   * shape is handed the context with the group's colours applied and paints
+   * each particle itself.
    */
-  drawCircleGroups(store: ParticleStore, groups: readonly IDrawGroup[]): void {
+  drawShapeGroups(store: ParticleStore, groups: readonly IDrawGroup[], shape: IShape): void {
+    const { trace, draw } = shape;
+    if (!trace && !draw) {
+      throw new TypeError(`bg-9000: shape "${shape.name}" has neither trace nor draw.`);
+    }
+
     const ctx = this.surface.ctx;
     const { x, y, radius } = store;
 
@@ -33,21 +39,44 @@ export class Canvas2DRenderer implements IRenderer {
       if (end <= group.start) continue;
       if (!group.fill && !group.stroke) continue;
 
-      ctx.beginPath();
-      for (let i = group.start; i < end; i++) {
-        ctx.moveTo(x[i] + radius[i], y[i]);
-        ctx.arc(x[i], y[i], radius[i], 0, TAU);
-      }
-
-      if (group.fill) {
-        ctx.fillStyle = group.fill;
-        ctx.fill();
-      }
-      if (group.stroke) {
+      if (trace) {
+        ctx.beginPath();
+        for (let i = group.start; i < end; i++) {
+          trace(ctx, x[i], y[i], radius[i], i, store);
+        }
+        paint(ctx, group);
+      } else {
+        // Saved per run, not per particle: a shape that sets a font or an
+        // alpha once keeps it for the run.
+        ctx.save();
+        if (group.fill) ctx.fillStyle = group.fill;
+        if (group.stroke) ctx.strokeStyle = group.stroke;
         ctx.lineWidth = group.lineWidth;
-        ctx.strokeStyle = group.stroke;
-        ctx.stroke();
+        for (let i = group.start; i < end; i++) {
+          draw!(ctx, x[i], y[i], radius[i], group, i, store);
+        }
+        ctx.restore();
       }
+    }
+  }
+
+  /** @deprecated Use `drawShapeGroups` with `SHAPES.circle`. */
+  drawCircleGroups(store: ParticleStore, groups: readonly IDrawGroup[]): void {
+    this.drawShapeGroups(store, groups, SHAPES.circle);
+  }
+
+  /**
+   * Saved and restored around the callback so that a layer cannot leak state
+   * into the field's draw calls — and `finally` so that a layer that throws
+   * does not leave the transform and styles wherever it left them.
+   */
+  drawImmediate(draw: (ctx: CanvasRenderingContext2D) => void): void {
+    const ctx = this.surface.ctx;
+    ctx.save();
+    try {
+      draw(ctx);
+    } finally {
+      ctx.restore();
     }
   }
 
@@ -57,5 +86,18 @@ export class Canvas2DRenderer implements IRenderer {
 
   dispose(): void {
     // The surface owns the context and canvas; nothing else to release.
+  }
+}
+
+/** Fill and/or stroke the current path in the group's colours. */
+function paint(ctx: CanvasRenderingContext2D, group: IDrawGroup): void {
+  if (group.fill) {
+    ctx.fillStyle = group.fill;
+    ctx.fill();
+  }
+  if (group.stroke) {
+    ctx.lineWidth = group.lineWidth;
+    ctx.strokeStyle = group.stroke;
+    ctx.stroke();
   }
 }

@@ -7,12 +7,12 @@
  * with outlines from another is the fastest route to something illegible, so
  * the unit of choice is the whole palette.
  */
-import type { ICustomPalette, IPalette } from '../model/theme/palettes.interface.js';
-import { isColour } from './colour.js';
+import type { ICustomPalette, IPalette } from '../model/theme/palettes.interface';
+import { isColour } from './colour';
 
 export type PaletteName = 'midnight' | 'blossom' | 'mint' | 'dusk' | 'ember';
 
-/** What a resolved palette calls itself: one of the five, or a caller's own. */
+/** What a resolved palette calls itself: one of the five, or custom. */
 export type PaletteId = PaletteName | 'custom';
 
 export const PALETTES: Readonly<Record<PaletteName, IPalette>> = {

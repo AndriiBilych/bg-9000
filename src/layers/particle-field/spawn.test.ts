@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { createRng } from '../../util/rng.js';
-import { SIZE_RADIUS, resolveCount } from '../../util/scalars.js';
-import { spawnField } from './spawn.js';
-import { ParticleStore } from './store.js';
+import { createRng } from '../../util/rng';
+import { SIZE_RADIUS, resolveCount } from '../../util/scalars';
+import { spawnField } from './spawn';
+import { ParticleStore } from './store';
 
 const DESKTOP = { width: 1920, height: 1080 };
 

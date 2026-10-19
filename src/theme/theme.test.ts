@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { normaliseConfig } from '../config/config.js';
-import { PRESETS, PRESET_NAMES, resolvePreset } from '../config/presets.js';
-import type { ICustomPalette } from '../model/theme/palettes.interface.js';
+import { normaliseConfig } from '../config/config';
+import { PRESETS, PRESET_NAMES, resolvePreset } from '../config/presets';
+import type { ICustomPalette } from '../model/theme/palettes.interface';
 import {
   CUSTOM_VARIANTS,
   PALETTES,
   PALETTE_NAMES,
   expandCustomPalette,
   isCustomPalette,
-} from './palettes.js';
-import { STYLES, STYLE_NAMES } from './styles.js';
-import { resolveTheme, variantCount } from './theme.js';
+} from './palettes';
+import { STYLES, STYLE_NAMES } from './styles';
+import { resolveTheme, variantCount } from './theme';
 
 const CUSTOM: ICustomPalette = {
   background: '#0B0B10',

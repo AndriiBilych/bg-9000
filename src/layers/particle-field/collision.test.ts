@@ -1,22 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { createPointerState } from '../../engine/scene-context.js';
-import type { ISceneContext } from '../../model/engine/scene-context.interface.js';
-import { createRng } from '../../util/rng.js';
-import { CircleCollisions } from './collision.js';
-import { spawnField } from './spawn.js';
-import { ParticleStore } from './store.js';
+import { createSceneContext } from '../../engine/scene-context';
+import type { ISceneContext } from '../../model/engine/scene-context.interface';
+import { createRng } from '../../util/rng';
+import { CircleCollisions } from './collision';
+import { spawnField } from './spawn';
+import { ParticleStore } from './store';
 
 function scene(width = 1280, height = 720): ISceneContext {
-  return {
-    width,
-    height,
-    dpr: 1,
-    time: 0,
-    dt: 1 / 60,
-    frame: 0,
-    pointer: createPointerState(),
-    rng: createRng(1),
-  };
+  return createSceneContext({ width, height, dt: 1 / 60, rng: createRng(1) });
 }
 
 /** Every overlapping pair, found the slow, obviously-correct way. */
