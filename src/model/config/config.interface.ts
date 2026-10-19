@@ -1,3 +1,4 @@
+import type { RendererKind } from '../../render/renderer-kind';
 import type { ShapeName } from '../../shapes/shapes';
 import type { PaletteName } from '../../theme/palettes';
 import type { CircleStyle } from '../../theme/styles';
@@ -38,6 +39,14 @@ export interface IBackgroundConfig {
 
   // --- the engine ----------------------------------------------------------
 
+  /**
+   * Which renderer draws the canvas. `canvas2d` is the default; `webgl` draws
+   * the same scene through WebGL2 and falls back to `canvas2d` (with an error
+   * on the console) where WebGL2 is unavailable. Read once, at creation: a
+   * canvas holds one kind of context for life, so a later `update` cannot
+   * change it.
+   */
+  renderer: RendererKind;
   /** Device pixel ratio ceiling. 2 is plenty for a soft background. */
   maxDpr: number;
   /** Fixed seed reproduces a layout exactly; omit for a random one. */

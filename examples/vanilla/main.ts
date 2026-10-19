@@ -2,18 +2,22 @@ import {
   PALETTE_NAMES,
   PRESETS,
   PRESET_NAMES,
+  RENDERER_KINDS,
   SHAPE_NAMES,
   STYLE_NAMES,
   createBackground,
   isCustomPalette,
+  isRendererKind,
   isShapeName,
   type Amount,
   type CircleStyle,
+  type IBackground,
   type IBackgroundConfig,
   type ICustomPalette,
   type IShape,
   type PaletteName,
   type PresetName,
+  type RendererKind,
   type ShapeName,
   type Size,
 } from 'bg-9000';
@@ -39,8 +43,9 @@ function options(select: HTMLSelectElement, values: readonly string[], selected:
   );
 }
 
-const canvas = el<HTMLCanvasElement>('bg');
+let canvas = el<HTMLCanvasElement>('bg');
 
+const rendererSelect = el<HTMLSelectElement>('renderer');
 const preset = el<HTMLSelectElement>('preset');
 const amount = el<HTMLSelectElement>('amount');
 const size = el<HTMLSelectElement>('size');
@@ -71,15 +76,21 @@ const fpsOut = el('fps');
 const countOut = el('count');
 const contactsOut = el('contacts');
 const dprOut = el('dpr');
+const activeOut = el('active');
 
-const bg = createBackground(canvas, {
+/** `?renderer=webgl` picks the renderer on load. */
+const requested = new URLSearchParams(location.search).get('renderer');
+
+let bg: IBackground = createBackground(canvas, {
   amount: 'moderate',
   size: 'medium',
   style: 'see-through',
   palette: 'mint',
   speed: 1,
+  renderer: isRendererKind(requested) ? requested : 'canvas2d',
 });
 
+options(rendererSelect, RENDERER_KINDS, bg.config.renderer);
 options(preset, ['—', ...PRESET_NAMES], '—');
 options(style, STYLE_NAMES, bg.config.style);
 options(palette, [...PALETTE_NAMES, CUSTOM], 'mint');
@@ -212,6 +223,29 @@ preset.addEventListener('input', () => {
   push();
 });
 
+/**
+ * A canvas keeps the first kind of context it hands out, so changing renderer
+ * means a new element: dispose the background, swap the canvas, and start
+ * again from the same config. Layers are reused — `init` after `dispose` is
+ * part of their contract.
+ */
+rendererSelect.addEventListener('input', () => {
+  const renderer = rendererSelect.value as RendererKind;
+  const config = bg.config;
+  bg.dispose();
+  const fresh = document.createElement('canvas');
+  fresh.id = canvas.id;
+  canvas.replaceWith(fresh);
+  canvas = fresh;
+  bg = createBackground(canvas, { ...config, renderer });
+  rendererSelect.value = bg.renderer;
+  const url = new URL(location.href);
+  url.searchParams.set('renderer', bg.renderer);
+  history.replaceState(null, '', url);
+  toggle.textContent = 'Pause';
+  paintSwatches();
+});
+
 reseed.addEventListener('click', () => {
   bg.update({ seed: (Math.random() * 0xffffffff) >>> 0 });
 });
@@ -231,6 +265,7 @@ setInterval(() => {
   countOut.textContent = bg.config.particles ? String(stats.count) : 'off';
   contactsOut.textContent = bg.config.collisions && bg.config.particles ? String(stats.contacts) : 'off';
   dprOut.textContent = String(Math.min(window.devicePixelRatio || 1, bg.config.maxDpr));
+  activeOut.textContent = bg.renderer;
 }, 250);
 
 push();

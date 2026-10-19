@@ -22,6 +22,18 @@ export interface IShape {
   readonly name: string;
 
   /**
+   * The outline differs from particle to particle — `trace` reads `i` or the
+   * store to rotate by index, orient along `vx`/`vy`, and so on.
+   *
+   * Canvas2D does not care. The WebGL renderer does: without this flag it
+   * traces the outline **once** at unit size and stamps every particle from
+   * that one mesh in a single instanced call. With it, every particle is
+   * re-traced each frame, as Canvas2D does anyway. Leaving it off on a shape
+   * that varies gives every particle the outline of particle 0. Default false.
+   */
+  readonly varies?: boolean;
+
+  /**
    * Add this particle's outline to `path`. Begin with a `moveTo` — the path
    * already holds the previous particle, and without one the two are joined by
    * a line. Do not fill, stroke, or change any context state.
@@ -46,4 +58,4 @@ export interface IShape {
 }
 
 /** The part of a shape the caller writes; `defineShape` adds the name. */
-export type IShapeDefinition = Pick<IShape, 'trace' | 'draw'>;
+export type IShapeDefinition = Pick<IShape, 'trace' | 'draw' | 'varies'>;

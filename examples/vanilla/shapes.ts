@@ -58,4 +58,24 @@ export const smiley: IShape = defineShape('smiley', {
   },
 });
 
-export const CUSTOM_SHAPES = { plus, smiley } as const;
+/**
+ * A custom `trace` shape that varies by particle: an arrowhead pointing along
+ * the particle's velocity, read from the store. `varies: true` tells the WebGL
+ * renderer it cannot trace this once and stamp it — every particle is
+ * re-traced each frame, as Canvas2D does anyway. Without the flag every
+ * needle would point the way particle 0 happens to be going.
+ */
+export const needle: IShape = defineShape('needle', {
+  varies: true,
+  trace(path, x, y, r, i, store) {
+    const a = Math.atan2(store.vy[i], store.vx[i]);
+    const dx = Math.cos(a);
+    const dy = Math.sin(a);
+    path.moveTo(x + dx * r, y + dy * r);
+    path.lineTo(x - dx * r * 0.5 - dy * r * 0.35, y - dy * r * 0.5 + dx * r * 0.35);
+    path.lineTo(x - dx * r * 0.5 + dy * r * 0.35, y - dy * r * 0.5 - dx * r * 0.35);
+    path.closePath();
+  },
+});
+
+export const CUSTOM_SHAPES = { plus, smiley, needle } as const;

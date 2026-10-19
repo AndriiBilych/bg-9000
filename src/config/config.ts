@@ -1,6 +1,7 @@
 import type { IBackgroundConfig } from '../model/config/config.interface';
 import type { ILayer } from '../model/layers/layer.interface';
 import type { ICustomPalette } from '../model/theme/palettes.interface';
+import { DEFAULT_RENDERER, isRendererKind, type RendererKind } from '../render/renderer-kind';
 import { DEFAULT_SHAPE, normaliseShape, type ShapeName } from '../shapes/shapes';
 import { DEFAULT_PALETTE, normalisePalette, type PaletteName } from '../theme/palettes';
 import { DEFAULT_STYLE, isCircleStyle, type CircleStyle } from '../theme/styles';
@@ -20,6 +21,7 @@ export const DEFAULT_CONFIG: Readonly<IBackgroundConfig> = {
   drag: 0,
   restitution: 1,
   maxCount: 1200,
+  renderer: DEFAULT_RENDERER,
   maxDpr: 2,
   pointer: true,
   layers: NO_LAYERS,
@@ -93,6 +95,7 @@ export function normaliseConfig(
     drag: clamp(merged.drag, 0, 100, base.drag),
     restitution: clamp(merged.restitution, 0, 1, base.restitution),
     maxCount: Math.round(clamp(merged.maxCount, 1, 20_000, base.maxCount)),
+    renderer: isRendererKind(merged.renderer) ? merged.renderer : base.renderer,
     maxDpr: clamp(merged.maxDpr, 1, 4, base.maxDpr),
     seed: merged.seed,
     pointer: flag(merged.pointer, base.pointer),
@@ -103,4 +106,4 @@ export function normaliseConfig(
 export type { Amount, Size };
 // Owned by the theme and shape modules — re-exported here so `IBackgroundConfig`
 // and every type it is built from can be imported from one place.
-export type { CircleStyle, ICustomPalette, PaletteName, ShapeName };
+export type { CircleStyle, ICustomPalette, PaletteName, RendererKind, ShapeName };

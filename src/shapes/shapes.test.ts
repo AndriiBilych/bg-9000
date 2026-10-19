@@ -192,6 +192,13 @@ describe('defineShape', () => {
     expect(both.draw).toBe(draw);
   });
 
+  it('carries `varies` when set, and not otherwise', () => {
+    expect(defineShape('v', { trace, varies: true }).varies).toBe(true);
+    expect('varies' in defineShape('n', { trace, varies: false })).toBe(false);
+    expect('varies' in defineShape('u', { trace })).toBe(false);
+    for (const shape of Object.values(SHAPES)) expect(shape.varies).toBeUndefined();
+  });
+
   it('throws on a shape that could never paint anything', () => {
     expect(() => defineShape('empty', {})).toThrow(TypeError);
     expect(() => defineShape('', { trace })).toThrow(TypeError);

@@ -28,8 +28,9 @@ function fakeContext(): { ctx: CanvasRenderingContext2D; log: string[] } {
 
 function renderer(): { r: Canvas2DRenderer; log: string[] } {
   const { ctx, log } = fakeContext();
-  const surface = { ctx, width: 100, height: 50 } as unknown as Surface;
-  return { r: new Canvas2DRenderer(surface), log };
+  const canvas = { getContext: () => ctx } as unknown as HTMLCanvasElement;
+  const surface = { width: 100, height: 50, dpr: 1, revision: 1 } as unknown as Surface;
+  return { r: new Canvas2DRenderer(canvas, surface), log };
 }
 
 function field(): { store: ParticleStore; groups: IDrawGroup[] } {
@@ -148,6 +149,29 @@ describe('Canvas2DRenderer.drawShapeGroups', () => {
     const { r, log } = renderer();
     r.drawShapeGroups(store, groups, SHAPES.star);
     expect(log).toEqual([]);
+  });
+});
+
+describe('Canvas2DRenderer.beginFrame', () => {
+  it('applies the DPR transform once per surface revision, then paints the background', () => {
+    const { ctx, log } = fakeContext();
+    const canvas = { getContext: () => ctx } as unknown as HTMLCanvasElement;
+    const surface = { width: 100, height: 50, dpr: 2, revision: 1 } as unknown as Surface;
+    const r = new Canvas2DRenderer(canvas, surface);
+    r.beginFrame('#123');
+    expect(log).toEqual(['setTransform(2,0,0,2,0,0)', 'fillStyle=#123', 'fillRect(0,0,100,50)']);
+    log.length = 0;
+    r.beginFrame(null);
+    expect(log).toEqual(['clearRect(0,0,100,50)']);
+    (surface as { revision: number }).revision = 2;
+    log.length = 0;
+    r.beginFrame(null);
+    expect(log[0]).toBe('setTransform(2,0,0,2,0,0)');
+  });
+
+  it('throws when the canvas cannot give a 2D context', () => {
+    const canvas = { getContext: () => null } as unknown as HTMLCanvasElement;
+    expect(() => new Canvas2DRenderer(canvas, {} as Surface)).toThrow(/2D context/);
   });
 });
 

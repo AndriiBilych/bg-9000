@@ -40,9 +40,10 @@ export function defineShape(name: string, definition: IShapeDefinition): IShape 
     throw new TypeError(`bg-9000: shape "${name}" needs a trace or a draw function.`);
   }
 
-  const shape: IShape = { name };
+  const shape: { -readonly [K in keyof IShape]: IShape[K] } = { name };
   if (trace) shape.trace = trace;
   if (draw) shape.draw = draw;
+  if (definition.varies) shape.varies = true;
   return Object.freeze(shape);
 }
 

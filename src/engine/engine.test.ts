@@ -4,6 +4,7 @@ import type { ILayer } from '../model/layers/layer.interface';
 import type { IRenderer } from '../model/render/renderer.interface';
 import { defineLayer } from '../layers/custom-layer';
 import { defineShape } from '../shapes/shapes';
+import { fakeGL, type IFakeGL } from '../render/webgl/webgl.fixture';
 import { createBackground } from './engine';
 
 /**
@@ -20,8 +21,28 @@ class FakeCanvasElement {
   height = 0;
   rect = { left: 10, top: 20, width: 800, height: 600 };
   drawn: string[] = [];
+  /** Kinds of context asked for, in order. */
+  requested: string[] = [];
+  /**
+   * A fake WebGL2 context. When present, `getContext('webgl2')` hands it out;
+   * when null the canvas has no WebGL2, as a browser without it would.
+   */
+  webgl: IFakeGL | null = null;
+  isConnected = false;
+  private readonly listeners = new Map<string, Set<Listener>>();
 
-  getContext(): unknown {
+  addEventListener(type: string, fn: Listener): void {
+    if (!this.listeners.has(type)) this.listeners.set(type, new Set());
+    this.listeners.get(type)!.add(fn);
+  }
+  removeEventListener(type: string, fn: Listener): void {
+    this.listeners.get(type)?.delete(fn);
+  }
+
+  getContext(kind = '2d'): unknown {
+    this.requested.push(kind);
+    if (kind === 'webgl2') return this.webgl?.gl ?? null;
+    if (kind !== '2d') return null;
     const drawn = this.drawn;
     return new Proxy(
       {},
@@ -99,6 +120,12 @@ afterEach(() => {
 
 function canvas(): HTMLCanvasElement {
   return new FakeCanvasElement() as unknown as HTMLCanvasElement;
+}
+
+function glCanvas(): { el: HTMLCanvasElement; fake: FakeCanvasElement; gl: IFakeGL } {
+  const fake = new FakeCanvasElement();
+  fake.webgl = fakeGL();
+  return { el: fake as unknown as HTMLCanvasElement, fake, gl: fake.webgl };
 }
 
 /** A layer that records its lifecycle and what it saw. */
@@ -396,6 +423,122 @@ describe('createBackground — pointer', () => {
     bg.update({ pointer: false });
     expect(listenerCount()).toBe(before);
     expect(layer.scene!.pointer).toEqual({ x: 0, y: 0, down: false, active: false });
+    bg.dispose();
+  });
+});
+
+describe('createBackground — renderer option', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('defaults to canvas2d and never asks the canvas for anything else', () => {
+    const { el, fake } = glCanvas();
+    const bg = createBackground(el);
+    expect(bg.config.renderer).toBe('canvas2d');
+    expect(bg.renderer).toBe('canvas2d');
+    expect(fake.requested).toEqual(['2d']);
+    expect(console.error).not.toHaveBeenCalled();
+    bg.dispose();
+  });
+
+  it('draws the field through WebGL when asked and the canvas agrees', () => {
+    const { el, fake, gl } = glCanvas();
+    const bg = createBackground(el, { renderer: 'webgl', seed: 1 });
+    expect(bg.renderer).toBe('webgl');
+    expect(bg.config.renderer).toBe('webgl');
+    expect(fake.requested).toEqual(['webgl2']);
+    expect(fake.drawn).toEqual([]);
+    expect(gl.log.some((l) => l.startsWith('drawArraysInstanced'))).toBe(true);
+    expect(bg.getStats().count).toBeGreaterThan(0);
+    expect(console.error).not.toHaveBeenCalled();
+
+    // Pause, clear, update: still renders through GL, still no 2D.
+    bg.pause();
+    gl.log.length = 0;
+    bg.update({ shape: 'star', palette: 'dusk' });
+    expect(gl.log.some((l) => l.startsWith('drawArraysInstanced'))).toBe(true);
+    expect(fake.drawn).toEqual([]);
+
+    bg.dispose();
+    expect(gl.log).toContain('getExtension("WEBGL_lose_context")');
+  });
+
+  it('falls back to canvas2d with an error on the console when WebGL2 is unavailable', () => {
+    const el = canvas();
+    const bg = createBackground(el, { renderer: 'webgl' });
+    expect(bg.renderer).toBe('canvas2d');
+    // The config keeps what was asked for; `renderer` says what happened.
+    expect(bg.config.renderer).toBe('webgl');
+    expect((el as unknown as FakeCanvasElement).requested).toEqual(['webgl2', '2d']);
+    expect((el as unknown as FakeCanvasElement).drawn.some((d) => d.startsWith('arc('))).toBe(true);
+    expect(console.error).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(console.error).mock.calls[0][0]).toMatch(/falling back to canvas2d/);
+    bg.dispose();
+  });
+
+  it('refuses to change renderer after creation, with an error on the console', () => {
+    const { el } = glCanvas();
+    const bg = createBackground(el, { renderer: 'webgl' });
+    bg.update({ renderer: 'canvas2d', amount: 'low' });
+    expect(bg.config.renderer).toBe('webgl');
+    expect(bg.config.amount).toBe('low');
+    expect(bg.renderer).toBe('webgl');
+    expect(console.error).toHaveBeenCalledTimes(1);
+    // Sending the same value again is fine and quiet.
+    bg.update({ renderer: 'webgl' });
+    expect(console.error).toHaveBeenCalledTimes(1);
+    bg.dispose();
+  });
+
+  it('runs a layer’s renderGL on WebGL and composites its render through the overlay otherwise', () => {
+    const overlay: string[] = [];
+    const overlayCtx = new Proxy(
+      {},
+      {
+        get: (_, key: string) => (...args: unknown[]) => {
+          overlay.push(args.length ? `${key}(${args.join(',')})` : `${key}()`);
+        },
+        set: () => true,
+      },
+    );
+    vi.stubGlobal('document', {
+      hidden: false,
+      addEventListener: on,
+      removeEventListener: off,
+      createElement: () => ({ fake: true, width: 0, height: 0, getContext: () => overlayCtx }),
+    });
+
+    const { el, gl } = glCanvas();
+    const render = vi.fn((ctx: CanvasRenderingContext2D) => ctx.fillRect(1, 2, 3, 4));
+    const renderGL = vi.fn();
+    const both = defineLayer('both', { render, renderGL });
+    const twoD = defineLayer('2d', { render: (ctx) => ctx.fillRect(5, 6, 7, 8) });
+    const bg = createBackground(el, { renderer: 'webgl', layers: [both, twoD] });
+
+    // `both` chose GL; only `twoD` went through the overlay.
+    expect(renderGL).toHaveBeenCalled();
+    expect(renderGL.mock.calls[0][0]).toBe(gl.gl);
+    expect(renderGL.mock.calls[0][1].width).toBe(800);
+    expect(renderGL.mock.calls[0][2].pixelWidth).toBe(800);
+    expect(render).not.toHaveBeenCalled();
+    expect(overlay).toContain('fillRect(5,6,7,8)');
+    expect(overlay).not.toContain('fillRect(1,2,3,4)');
+    // …and was uploaded and composited.
+    expect(gl.log.some((l) => l.startsWith('texImage2D') && l.endsWith('canvas)'))).toBe(true);
+    bg.dispose();
+  });
+
+  it('ignores renderGL on canvas2d and uses render', () => {
+    const el = canvas();
+    const render = vi.fn();
+    const renderGL = vi.fn();
+    const bg = createBackground(el, { layers: [defineLayer('l', { render, renderGL })] });
+    expect(render).toHaveBeenCalled();
+    expect(renderGL).not.toHaveBeenCalled();
     bg.dispose();
   });
 });

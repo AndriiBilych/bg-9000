@@ -1,7 +1,16 @@
 export { createBackground } from './engine/engine';
 
 export { DEFAULT_CONFIG, normaliseConfig, normaliseLayers, isLayer } from './config/config';
-export type { CircleStyle, ICustomPalette, PaletteName, ShapeName } from './config/config';
+export type { CircleStyle, ICustomPalette, PaletteName, RendererKind, ShapeName } from './config/config';
+
+// --- renderers ------------------------------------------------------------
+// `canvas2d` by default; `webgl` on request, falling back to `canvas2d` where
+// WebGL2 is missing. `parseColour` is what the WebGL renderer reads CSS colours
+// with, exported for a GL layer that wants the palette as numbers.
+
+export { RENDERER_KINDS, DEFAULT_RENDERER, isRendererKind } from './render/renderer-kind';
+export { parseColour } from './theme/colour-parse';
+export type { RGBA } from './theme/colour-parse';
 
 export { PRESETS, PRESET_NAMES, isPresetName, resolvePreset } from './config/presets';
 export type { PresetName } from './config/presets';
@@ -74,6 +83,7 @@ export type {
 } from './model/layers/particle-field/spawn.interface';
 export type { IForce, IConstraint } from './model/forces/force.interface';
 export type { IRenderer, IDrawGroup } from './model/render/renderer.interface';
+export type { IGLFrame, IGLTexture } from './model/render/gl-frame.interface';
 export type { IPalette } from './model/theme/palettes.interface';
 export type { IStyleSpec } from './model/theme/styles.interface';
 export type { ITheme, IColourVariant } from './model/theme/theme.interface';

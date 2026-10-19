@@ -4,6 +4,14 @@ import { defineShape } from '../shapes/shapes';
 import { DEFAULT_CONFIG, isLayer, normaliseConfig, normaliseLayers } from './config';
 
 describe('normaliseConfig', () => {
+  it('defaults to canvas2d and accepts only the known renderers', () => {
+    expect(normaliseConfig(undefined).renderer).toBe('canvas2d');
+    expect(normaliseConfig({ renderer: 'webgl' }).renderer).toBe('webgl');
+    expect(normaliseConfig({ renderer: 'webgpu' as never }).renderer).toBe('canvas2d');
+    expect(normaliseConfig({ renderer: 'canvas2d' }, normaliseConfig({ renderer: 'webgl' })).renderer).toBe('canvas2d');
+    expect(normaliseConfig({}, normaliseConfig({ renderer: 'webgl' })).renderer).toBe('webgl');
+  });
+
   it('defaults to circles, the field on, the pointer on, and no layers', () => {
     const config = normaliseConfig(undefined);
     expect(config.shape).toBe('circle');

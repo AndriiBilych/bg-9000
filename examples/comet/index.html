@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>bg-9000 — comets</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./comet.css" />
+  </head>
+  <body>
+    <canvas id="sky"></canvas>
+
+    <header class="title">
+      <h1>Comets</h1>
+      <p class="hint">move to stir · hold to gather</p>
+      <p class="about">
+        A swarm assembled from <code>ParticleStore</code>, two forces and a
+        wrap constraint, rendered through <code>drawShapeGroups</code> — one
+        instanced call per colour on WebGL. The trail is a pair of layers: one
+        copies the frame out, the other draws it back faded.
+        <a href="../vanilla/">← Playground</a>
+      </p>
+    </header>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

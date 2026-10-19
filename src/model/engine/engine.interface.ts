@@ -1,5 +1,6 @@
 import type { IBackgroundConfig } from '../config/config.interface';
 import type { ILayer } from '../layers/layer.interface';
+import type { RendererKind } from '../../render/renderer-kind';
 import type { ITheme } from '../theme/theme.interface';
 
 export interface IBackgroundStats {
@@ -22,6 +23,11 @@ export interface IBackground {
    * content — without duplicating the palette table.
    */
   readonly theme: ITheme;
+  /**
+   * The renderer actually drawing. Usually `config.renderer`; differs when
+   * `webgl` was asked for and the canvas fell back to `canvas2d`.
+   */
+  readonly renderer: RendererKind;
   /** Apply a partial config. Rebuilds only what the change requires. */
   update(patch: Partial<IBackgroundConfig>): void;
   /**

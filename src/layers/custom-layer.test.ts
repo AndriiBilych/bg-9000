@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createSceneContext } from '../engine/scene-context';
+import type { IGLFrame } from '../model/render/gl-frame.interface';
 import type { IRenderer } from '../model/render/renderer.interface';
 import { defineLayer } from './custom-layer';
 
@@ -13,6 +14,30 @@ function immediateRenderer(): IRenderer & { ctx: CanvasRenderingContext2D } {
     drawCircleGroups() {},
     drawImmediate(draw) {
       draw(ctx);
+    },
+    endFrame() {},
+    dispose() {},
+  };
+}
+
+/** A renderer with both escape hatches, like the WebGL renderer. */
+function dualRenderer(): IRenderer & { ctx: CanvasRenderingContext2D; gl: WebGL2RenderingContext; frame: IGLFrame } {
+  const ctx = {} as CanvasRenderingContext2D;
+  const gl = {} as WebGL2RenderingContext;
+  const frame = {} as IGLFrame;
+  return {
+    kind: 'dual',
+    ctx,
+    gl,
+    frame,
+    beginFrame() {},
+    drawShapeGroups() {},
+    drawCircleGroups() {},
+    drawImmediate(draw) {
+      draw(ctx);
+    },
+    drawImmediateGL(draw) {
+      draw(gl, frame);
     },
     endFrame() {},
     dispose() {},
@@ -85,6 +110,35 @@ describe('defineLayer', () => {
     const renderer = immediateRenderer();
     const spy = vi.spyOn(renderer, 'drawImmediate');
     defineLayer('x', { update() {} }).render(renderer, createSceneContext());
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('prefers renderGL where the renderer offers GL, and falls back to render where it does not', () => {
+    const render = vi.fn();
+    const renderGL = vi.fn();
+    const def = { render, renderGL };
+    const layer = defineLayer('x', def);
+    const scene = createSceneContext();
+
+    const dual = dualRenderer();
+    layer.render(dual, scene);
+    expect(renderGL).toHaveBeenCalledWith(dual.gl, scene, dual.frame);
+    expect(renderGL.mock.instances[0]).toBe(def);
+    expect(render).not.toHaveBeenCalled();
+
+    const twoD = immediateRenderer();
+    layer.render(twoD, scene);
+    expect(render).toHaveBeenCalledWith(twoD.ctx, scene);
+    expect(renderGL).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses render through the GL renderer’s overlay when there is no renderGL', () => {
+    const render = vi.fn();
+    const layer = defineLayer('x', { render });
+    const dual = dualRenderer();
+    const spy = vi.spyOn(dual, 'drawImmediateGL');
+    layer.render(dual, createSceneContext());
+    expect(render).toHaveBeenCalledWith(dual.ctx, expect.anything());
     expect(spy).not.toHaveBeenCalled();
   });
 

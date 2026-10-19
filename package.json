@@ -1,6 +1,6 @@
 {
   "name": "bg-9000",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Framework-agnostic animated canvas backgrounds.",
   "license": "MIT",
   "type": "module",
@@ -19,7 +19,8 @@
     }
   },
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --open /vanilla/",
+    "comet": "vite --open /comet/",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -27,6 +28,7 @@
   },
   "keywords": [
     "canvas",
+    "webgl",
     "background",
     "particles",
     "animation"

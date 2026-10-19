@@ -7,7 +7,8 @@ import type { ILayer } from '../model/layers/layer.interface';
 import type { IParticleFieldOptions } from '../model/layers/particle-field/particle-field.interface';
 import type { IRenderer } from '../model/render/renderer.interface';
 import type { ITheme } from '../model/theme/theme.interface';
-import { Canvas2DRenderer } from '../render/canvas2d';
+import { createRenderer } from '../render/create-renderer';
+import type { RendererKind } from '../render/renderer-kind';
 import { resolveTheme } from '../theme/theme';
 import { createRng } from '../util/rng';
 import { Clock } from './clock';
@@ -81,7 +82,8 @@ export function createBackground(
   ctx.height = surface.height;
   ctx.dpr = surface.dpr;
 
-  const renderer: IRenderer = new Canvas2DRenderer(surface);
+  const renderer: IRenderer = createRenderer(config.renderer, canvas, surface);
+  const rendererKind = renderer.kind as RendererKind;
   const tracker = new PointerTracker(canvas, pointer);
 
   const field = new ParticleField(fieldOptions(config, theme));
@@ -170,6 +172,15 @@ export function createBackground(
     if (disposed) return;
     const previous = config;
     config = normaliseConfig(next, config);
+
+    if (config.renderer !== previous.renderer) {
+      // A canvas holds one kind of context for life; the only way to change
+      // renderer is a new canvas and a new background.
+      console.error(
+        `bg-9000: renderer cannot change after creation (asked for "${config.renderer}", staying on "${previous.renderer}").`,
+      );
+      config = { ...config, renderer: previous.renderer };
+    }
     ctx.config = config;
 
     if (config.seed !== previous.seed) {
@@ -205,6 +216,8 @@ export function createBackground(
     get theme(): ITheme {
       return theme;
     },
+
+    renderer: rendererKind,
 
     update,
 

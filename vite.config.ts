@@ -5,13 +5,14 @@ import { fileURLToPath } from 'node:url';
 const entry = fileURLToPath(new URL('./src/index.ts', import.meta.url));
 
 export default defineConfig(({ command }): UserConfig => {
-  // `npm run dev` serves the playground with the library aliased to source, so
-  // edits hot-reload without a build step.
+  // `npm run dev` serves the examples with the library aliased to source, so
+  // edits hot-reload without a build step. The root is the examples folder;
+  // each example is a directory under it and the scripts pick which to open.
   if (command === 'serve') {
     return {
-      root: 'examples/vanilla',
+      root: 'examples',
       resolve: { alias: { 'bg-9000': entry } },
-      server: { open: true },
+      server: { open: '/vanilla/' },
     };
   }
 

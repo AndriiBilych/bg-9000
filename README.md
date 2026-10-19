@@ -3,9 +3,9 @@
 Framework-agnostic animated canvas backgrounds. No React, no Angular, no DOM
 framework of any kind — just a canvas element and a config object.
 
-> **Status: v0.1** A field of drifting, colliding shapes with amount,
-> size, style, palette and shape options — plus custom shapes and custom
-> layers on the same engine.
+> **Status: v0.2.** A field of drifting, colliding shapes with amount, size,
+> style, palette and shape options — plus custom shapes and custom layers
+> on the same engine, drawn through Canvas2D or, on request, WebGL2.
 
 ## Usage
 
@@ -20,6 +20,7 @@ const bg = createBackground(document.querySelector('canvas')!, {
   shape: 'circle',           // 'circle' | 'square' | 'triangle' | 'hexagon' | 'star' | 'heart'
   collisions: true,
   speed: 1,
+  renderer: 'canvas2d',      // 'canvas2d' | 'webgl' — see Renderers
 });
 
 bg.update({ amount: 'alot' });   // live; rebuilds only what changed
@@ -60,6 +61,7 @@ own content.
 | `drag` | `number` | `0` | Velocity damping; 0 skips the force entirely |
 | `restitution` | `number` | `1` | Velocity retained on a wall bounce |
 | `maxCount` | `number` | `1200` | Hard ceiling regardless of density |
+| `renderer` | `'canvas2d' \| 'webgl'` | `'canvas2d'` | Which [renderer](#renderers) draws. Read once, at creation |
 | `maxDpr` | `number` | `2` | Device pixel ratio cap |
 | `seed` | `number?` | — | Fixed seed reproduces a layout exactly |
 | `style` | `'see-through' \| 'dot' \| 'full'` | `'see-through'` | Outline only, fill only, or both |
@@ -86,6 +88,74 @@ count, because a count that reads well on a monitor suffocates a phone.
 A coverage guard caps the count wherever the circles would occupy more than 45%
 of the canvas, so `large` + `alot` sheds circles rather than spawning a field
 that starts deeply overlapped.
+
+## Renderers
+
+Two renderers draw the same scene — the field, every built-in and custom
+shape, your layers. `canvas2d`, the default, draws through the 2D context.
+`webgl` draws through WebGL2:
+
+```ts
+const bg = createBackground(canvas, { renderer: 'webgl', amount: 'alot' });
+bg.renderer;   // 'webgl', or 'canvas2d' if the canvas could not provide it
+```
+
+Where WebGL2 is unavailable — an old Safari, a blocklisted GPU, a canvas that
+has already handed out a 2D context — the background falls back to Canvas2D,
+reports why on the console, and carries on. `bg.renderer` says which renderer
+is actually drawing; `bg.config.renderer` keeps what was asked for.
+
+The choice is made once. A canvas holds one kind of context for life, so
+`update({ renderer })` cannot honour a change: it logs an error and keeps the
+renderer it has. To switch, dispose the background, replace the canvas element,
+and create a new one — the playground's renderer select does exactly that.
+
+### What WebGL does with the scene
+
+Each colour run of the field is one instanced draw: `store.x`, `store.y` and
+`store.radius` are uploaded as instance attributes straight from the typed
+arrays, and the glyph is a unit mesh traced once from the shape's `trace` and
+placed by the vertex shader. Fills go through the stencil buffer as a triangle
+fan counted under the non-zero rule, so anything a `trace` can outline —
+concave stars, the heart's curves, a plus made of one subpath, a shape that
+crosses itself — fills exactly as the 2D context would fill it. Strokes are
+expanded in the shader by half the line width, so outlines stay a constant
+pixel width at every radius, and are resolved through the stencil too, so a
+translucent outline never darkens where it overlaps itself. Twelve draw calls
+a frame for three colour runs, whatever the count.
+
+Four things differ from Canvas2D, each degraded rather than dropped:
+
+- **A `draw`-only shape is drawn as circles.** `draw` paints with the 2D API
+  — text, gradients, partial arcs — and there is no GL equivalent. The field
+  stays visible, the console says once which shape and why. Give the shape a
+  `trace` or stay on `canvas2d`.
+- **A shape whose outline varies by particle must say so.** The instanced path
+  traces the glyph once; a `trace` that reads `i` or the store to rotate or
+  orient needs [`varies: true`](#custom-shapes), which re-traces each
+  particle every frame instead.
+- **Colours are parsed, not handed to the browser.** Hex, `rgb()`, `hsl()`,
+  the named colours and `transparent` are understood; anything else
+  (`oklch()`, `color-mix()`) is reported once and not painted.
+- **Anti-aliasing is the GPU's multisampling**, not the 2D context's coverage
+  AA — marginally different edges, and on a mobile GPU that ignores the hint,
+  visibly stepped ones.
+
+A layer written with `defineLayer` against the 2D context draws on WebGL
+through an overlay: the renderer gives it an offscreen 2D canvas of the same
+size, then uploads and composites that, in order, before its next GL draw. That is one texture
+upload per frame in which such a layer drew — correct and drop-in, not fast.
+The fast path is a layer that draws GL itself; see [GL layers](#gl-layers).
+
+A lost context — a driver reset, a backgrounded mobile tab, a page over the
+browser's context limit — stops drawing until the browser restores it, at
+which point the renderer rebuilds its programs, buffers, meshes and every
+texture a layer made through `IGLFrame`. Nothing needs to be done by the
+caller. Disposing a WebGL background whose canvas has left the document
+releases its context outright rather than waiting for garbage collection, so
+a page that swaps canvases does not run out of contexts; a canvas still in
+the document keeps its context, because a released one is dead for good and
+the next `createBackground` on that canvas would inherit it.
 
 ## Colour
 
@@ -209,6 +279,29 @@ Both functions also receive the particle's index and the `ParticleStore`, so a
 shape can orient itself along `vx`/`vy` or hash the index into a stable
 rotation. When a shape offers both, `trace` is used.
 
+A `trace` that does read `i` or the store must say so with `varies: true`:
+
+```ts
+const needle = defineShape('needle', {
+  varies: true,
+  trace(path, x, y, r, i, store) {
+    const a = Math.atan2(store.vy[i], store.vx[i]);
+    const dx = Math.cos(a);
+    const dy = Math.sin(a);
+    path.moveTo(x + dx * r, y + dy * r);
+    path.lineTo(x - dx * r * 0.5 - dy * r * 0.35, y - dy * r * 0.5 + dx * r * 0.35);
+    path.lineTo(x - dx * r * 0.5 + dy * r * 0.35, y - dy * r * 0.5 - dx * r * 0.35);
+    path.closePath();
+  },
+});
+```
+
+Canvas2D ignores the flag. The WebGL renderer traces an unflagged shape once,
+at unit size, and stamps every particle from that one mesh in a single
+instanced call; a flagged one is re-traced per particle per frame, which is
+what Canvas2D does anyway. Leave it off a shape that varies and every
+particle gets the outline of particle 0.
+
 ## Custom layers
 
 The field is one `ILayer`; the engine runs a stack of them. Anything that is
@@ -286,12 +379,66 @@ createBackground(canvas, {
 });
 ```
 
+### GL layers
+
+On the WebGL renderer a layer can draw GL directly with `renderGL`, the sibling
+of `render`. A layer may carry either or both: on WebGL `renderGL` is used when
+present and `render` is composited through the overlay otherwise; on Canvas2D
+only `render` runs. So a layer with both degrades on its own terms, and a
+layer with only `renderGL` simply draws nothing on Canvas2D.
+
+```ts
+const glow = defineLayer('glow', {
+  placement: 'below',
+  renderGL(gl, scene, frame) {
+    const program = frame.program(`#version 300 es
+      precision mediump float;
+      in vec2 v_uv;
+      uniform vec2 u_pointer;
+      uniform vec4 u_colour;
+      out vec4 o;
+      void main() {
+        float d = distance(v_uv, u_pointer);
+        o = u_colour * exp(-d * d * 12.0);
+      }`);
+    gl.useProgram(program);
+    // CSS y runs down; v_uv runs up, like every GL texture.
+    gl.uniform2f(gl.getUniformLocation(program, 'u_pointer'),
+      scene.pointer.x / scene.width, 1 - scene.pointer.y / scene.height);
+    const [r, g, b] = parseColour(scene.theme.variants[0].stroke ?? '#fff')!;
+    gl.uniform4f(gl.getUniformLocation(program, 'u_colour'), r, g, b, 1);
+    frame.quad();
+  },
+});
+```
+
+Before the call the context is in a known state — full viewport, premultiplied
+blending on, stencil, depth and scissor off, no vertex array bound — and
+nothing is assumed about it afterwards, so there is nothing to restore.
+`frame` is what a shader layer needs besides the context:
+
+| | |
+|---|---|
+| `width`, `height`, `dpr`, `pixelWidth`, `pixelHeight` | CSS and device pixel sizes |
+| `projection` | column-major `mat3` taking CSS pixels (y down) to clip space, for drawing in the same coordinates as a 2D layer |
+| `program(fragment, vertex?)` | compiled once per source, rebuilt after a context loss, released with the renderer. The default vertex shader is a full-screen quad exposing `v_uv` in `[0, 1]`, origin bottom-left, with `a_position` at attribute 0 |
+| `quad()` | draws that full-screen quad with the current program |
+| `texture()` | a texture the size of the drawing buffer, which follows resizes and survives context loss. Read `.texture` each frame; `dispose()` when done |
+| `copy(target)` | copies everything drawn so far this frame into it |
+| `blit(source, alpha?)` | draws it over the whole canvas, scaled by `alpha`, premultiplied |
+| `generation` | increments on every context restore, for a layer that owns GL resources of its own |
+
+`copy` and `blit` are what a post-effect is made of — the comets example keeps
+last frame's image in a `texture()`, blits it back faded under the new frame,
+then copies the result out again, and that is its trail. `parseColour` is
+exported so a shader can take the palette as numbers.
+
 ### The full `ILayer`
 
 `defineLayer` is sugar. A class implementing `ILayer` directly gets the
-`IRenderer` rather than the context, and uses `renderer.drawImmediate(fn)` for
-direct drawing — an optional member, so a backend that cannot offer a 2D
-context simply omits it and the layer draws nothing there.
+`IRenderer` rather than the context, and uses `renderer.drawImmediate(fn)` or
+`renderer.drawImmediateGL(fn)` for direct drawing — both optional members, so
+a renderer offers the ones it can honour and a layer checks before calling.
 
 ### Pointer
 
@@ -377,12 +524,25 @@ forces → integrate → constraints → render
 - **`ParticleStore`** is structure-of-arrays over typed arrays. Nothing
   allocates per frame, and the buffers are transferable to a worker later.
 - **`IRenderer`** is batch-shaped (`drawShapeGroups`, never `drawShape`). A
-  per-primitive interface cannot be implemented efficiently on WebGL. A
-  tracing shape keeps that batch — one path per colour run — and a drawing
-  shape is the stated exception; a renderer that cannot draw a shape throws.
-  The one optional member, `drawImmediate`, hands custom layers the 2D context
-  with state saved and restored around them. `drawCircleGroups` remains as a
-  deprecated alias for `drawShapeGroups(…, SHAPES.circle)` until 0.2.
+  per-primitive interface cannot be implemented efficiently on WebGL, where
+  the whole point is one instanced call per colour run, fed directly from the
+  store's typed arrays. A tracing shape keeps that batch — one path per colour
+  run on Canvas2D, one mesh on WebGL — and a drawing shape is the stated
+  exception, drawn as circles where it cannot run. The two optional members,
+  `drawImmediate` and `drawImmediateGL`, hand custom layers the 2D context
+  (state saved and restored) or the GL one (state reset before, not trusted
+  after). `drawCircleGroups` is a deprecated alias for
+  `drawShapeGroups(…, SHAPES.circle)`.
+- **`Surface`** owns size and DPR and nothing else; a canvas can hold only
+  one kind of context, so the renderer acquires it. Each renderer re-syncs to
+  the surface's `revision` at the top of a frame — a transform on the 2D
+  context, a viewport and projection on the GL one.
+- **The WebGL renderer** (`render/webgl/`) is four parts: a `PathRecorder`
+  that implements `CanvasPath` and flattens curves to a tolerance; a
+  tessellator that turns the polylines into stencil fans, stroke quads with
+  per-vertex normals, and cover quads; the renderer, which owns the GPU
+  resources and rebuilds them on context loss; and a 2D overlay for layers
+  written against the context.
 - **`ISceneContext`** is built once by the engine and mutated in place. Test
   fixtures should use `createSceneContext()` rather than a literal, so that a
   new field on it is never a change they have to make.
@@ -399,16 +559,28 @@ the package root.
 ## Development
 
 ```bash
-npm run dev        # playground at localhost:5173, contact sheet at /gallery.html
+npm run dev        # playground at localhost:5173/vanilla/, contact sheet at /vanilla/gallery.html
+npm run comet      # the comets example at /comet/
 npm test           # vitest
 npm run build      # dist/ — ESM, CJS, and .d.ts
 npm run typecheck
 ```
 
+The examples are served from one dev server rooted at `examples/`, with the
+library aliased to `src/` so edits hot-reload without a build. `?renderer=webgl`
+on the playground URL picks the renderer on load.
+
+The WebGL renderer is tested the way the Canvas2D one is: against a context
+that records every call (`render/webgl/webgl.fixture.ts`), plus pure tests of
+the path recorder, the tessellator and the colour parser. What those cannot
+check — that the pixels look right — is a matter of opening the playground
+with `?renderer=webgl` and comparing it with the default.
+
 Visual check, with the dev server running:
 
 ```bash
 node scripts/screenshot.mjs out.png
+node scripts/screenshot.mjs out-gl.png "http://localhost:5173/vanilla/?renderer=webgl"
 ```
 
 It reports frame rate, particle count, whether the canvas has lit pixels, and

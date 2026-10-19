@@ -11,7 +11,12 @@
     <canvas id="bg"></canvas>
 
     <aside class="panel">
-      <h1>bg-9000 <span class="ver">v0.1</span></h1>
+      <h1>bg-9000 <span class="ver">v0.2</span></h1>
+
+      <div class="row">
+        <label for="renderer">Renderer</label>
+        <select id="renderer"></select>
+      </div>
 
       <div class="row">
         <label for="preset">Preset</label>
@@ -113,13 +118,20 @@
         <div><dt>circles</dt><dd id="count">–</dd></div>
         <div><dt>contacts</dt><dd id="contacts">–</dd></div>
         <div><dt>dpr</dt><dd id="dpr">–</dd></div>
+        <div><dt>renderer</dt><dd id="active">–</dd></div>
       </dl>
 
       <p class="note">
         Contacts is overlapping pairs resolved on the last step.
-        <em>plus</em> and <em>smiley</em> are custom shapes; the waves layer is a
-        custom layer that follows amount, speed, palette and the pointer.
+        <em>plus</em>, <em>smiley</em> and <em>needle</em> are custom shapes;
+        the waves layer is a custom layer that follows amount, speed, palette
+        and the pointer. Switching renderer swaps the canvas element — a canvas
+        keeps one kind of context for life. On WebGL, <em>smiley</em> (a
+        <code>draw</code> shape) is drawn as circles, <em>needle</em>
+        (<code>varies: true</code>) is re-traced per particle, and the waves
+        are composited through the 2D overlay.
         <a href="./gallery.html">All 15 combinations →</a>
+        <a href="../comet/">Comets →</a>
       </p>
     </aside>
 
