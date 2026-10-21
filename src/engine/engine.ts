@@ -75,7 +75,11 @@ export function createBackground(
     ctx.dpr = dpr;
     if (!initialised) return;
     for (const layer of stack) layer.resize(ctx, prevWidth, prevHeight);
-    if (!running) renderFrame();
+    // Even while running: resizing the canvas just wipes it, and the next
+    // frame may come after the browser paints. A host whose viewport resizes
+    // every frame (a phone's bars sliding, an in-app browser's chrome
+    // collapsing) would otherwise flash blank until the resizing stopped.
+    renderFrame();
   });
 
   ctx.width = surface.width;

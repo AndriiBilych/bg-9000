@@ -275,6 +275,32 @@ describe('createBackground — layers', () => {
     bg.dispose();
   });
 
+  it('redraws as soon as the canvas resizes, without waiting for the running loop', () => {
+    let observed: (() => void) | undefined;
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: () => void) {
+          observed = callback;
+        }
+        observe(): void {}
+        disconnect(): void {}
+      },
+    );
+    const layer = probe('p');
+    const fake = new FakeCanvasElement();
+    const bg = createBackground(fake as unknown as HTMLCanvasElement, { layers: [layer] });
+    tick(0);
+    expect(bg.getStats().running).toBe(true);
+
+    fake.rect = { ...fake.rect, height: 500 };
+    layer.log.length = 0;
+    observed!();
+    // Resizing wiped the canvas; it is drawn again in the same turn, no frame needed.
+    expect(layer.log).toEqual(['resize', 'render']);
+    bg.dispose();
+  });
+
   it('diffs the list on update: new layers init, dropped layers dispose, kept ones are untouched', () => {
     const a = probe('a');
     const b = probe('b');
